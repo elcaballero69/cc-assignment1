@@ -1,9 +1,9 @@
 # AWS LAB
 ## CURRENTLY WORKING ON:
-Aura:
-Cedric: Writing a sh file that initiates flask on an ubuntu environment
-Nick:
-Victor
+Aura:\
+Cedric: D\
+Nick:\
+Victor\
 
 ## LAB GOALS:
 Create  clusters using EC2 and ELB
