@@ -1,6 +1,7 @@
 # Keys are defined in configuration file, do we need to do anything else??
 import boto3
 import json
+import time
 
 ec2_client = boto3.client("ec2")
 ec2 = boto3.resource('ec2')
@@ -99,10 +100,12 @@ def main(ec2_client, ec2):
     for instance in instances_t2_c:
         instance_ids.append(instance.id)
 
-    print(instance_ids)
+    return instance_ids
 
 
 def values(ec2_client, instance_ids):
+    # test 
+    # time.sleep(10)
     
     """
     ------
@@ -120,12 +123,18 @@ def values(ec2_client, instance_ids):
     # returns a list with a lot of paramaeters for each instance, PublicIpAddress parameter has the Public IPv4 address used for connection
 
     instance_list = instance_data_raw["Reservations"][0]["Instances"]
+    print(len(instance_list))
 
-    print(instance_data_raw)
+    print(len(instance_data_raw["Reservations"]))
 
     # Example Get IP address
-    print(instance_data_raw["Reservations"][0]["Instances"][0]["PublicIpAddress"])
+    ins_ids = []
 
+    for res_id in range(len(instance_data_raw["Reservations"])):
+        for ins_id in range(len(instance_data_raw["Reservations"][res_id]["Instances"])):
+            ins_ids.append(instance_data_raw["Reservations"][res_id]["Instances"][ins_id]["PublicIpAddress"])
+
+    print(ins_ids)
 
 
 main(ec2_client, ec2)
