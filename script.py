@@ -101,7 +101,7 @@ def main(ec2_client, ec2, elbv2):
     for instance in instances_t2_c:
         instance_ids.append(instance.id)
 
-    return instance_ids
+    print(instance_ids)
 
     # create target groups
     targetGroupT2 = elbv2.create_target_group(
@@ -120,8 +120,25 @@ def main(ec2_client, ec2, elbv2):
     print(targetGroupT2)
     print(targetGroupM4)
 
-    # assign instances to target groups
+    # get targetGroupARN
+    print(targetGroupT2['TargetGroups'])
+    print(targetGroupT2['TargetGroups'][0])
+    print(targetGroupT2['TargetGroups'][0].get('TargetGroupArn'))
+    ARN_T2=targetGroupT2['TargetGroups'][0].get('TargetGroupArn')
+    ARN_M4 = targetGroupM4['TargetGroups'][0].get('TargetGroupArn')
 
+    # assign instances to target groups
+    time.sleep(15)
+    targetgroupInstances_T2 = elbv2.register_targets(
+        TargetGroupArn=ARN_T2,
+        Targets=[
+            {
+                'Id': instance_ids[0]
+            }
+        ]
+    )
+
+    print(targetgroupInstances_T2)
 
 
 
