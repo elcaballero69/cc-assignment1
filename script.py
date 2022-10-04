@@ -85,23 +85,31 @@ def main(ec2_client, ec2, elbv2):
     print(instances_t2_a)
 
     instance_ids = []
+    T2_instance_ids = []
+    M4_instance_ids = []
 
     for instance in instances_t2_a:
         instance_ids.append(instance.id)
+        T2_instance_ids.append({'Id': instance.id})
 
     for instance in instances_m4_a:
         instance_ids.append(instance.id)
+        M4_instance_ids.append({'Id': instance.id})
 
     for instance in instances_t2_b:
         instance_ids.append(instance.id)
+        T2_instance_ids.append({'Id': instance.id})
 
     for instance in instances_m4_b:
         instance_ids.append(instance.id)
+        M4_instance_ids.append({'Id': instance.id})
 
     for instance in instances_t2_c:
         instance_ids.append(instance.id)
+        T2_instance_ids.append({'Id': instance.id})
 
-    print(instance_ids)
+    print(T2_instance_ids)
+    print(M4_instance_ids)
 
     # create target groups
     targetGroupT2 = elbv2.create_target_group(
@@ -121,24 +129,25 @@ def main(ec2_client, ec2, elbv2):
     print(targetGroupM4)
 
     # get targetGroupARN
-    print(targetGroupT2['TargetGroups'])
-    print(targetGroupT2['TargetGroups'][0])
-    print(targetGroupT2['TargetGroups'][0].get('TargetGroupArn'))
+
     ARN_T2=targetGroupT2['TargetGroups'][0].get('TargetGroupArn')
     ARN_M4 = targetGroupM4['TargetGroups'][0].get('TargetGroupArn')
 
     # assign instances to target groups
-    time.sleep(15)
+    time.sleep(25)
     targetgroupInstances_T2 = elbv2.register_targets(
         TargetGroupArn=ARN_T2,
-        Targets=[
-            {
-                'Id': instance_ids[0]
-            }
-        ]
+        Targets=T2_instance_ids
+    )
+    targetgroupInstances_M4 = elbv2.register_targets(
+        TargetGroupArn=ARN_M4,
+        Targets=M4_instance_ids
     )
 
     print(targetgroupInstances_T2)
+    print(targetgroupInstances_M4)
+
+    #TODO create load balancer
 
 
 
