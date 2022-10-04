@@ -5,6 +5,7 @@ import time
 
 ec2_client = boto3.client("ec2")
 ec2 = boto3.resource('ec2')
+elbv2 = boto3.client('elbv2')
 
 
 def createInstances(ec2, INSTANCE_TYPE, COUNT, SECURITY_GROUP, SUBNET_ID):
@@ -19,10 +20,10 @@ def createInstances(ec2, INSTANCE_TYPE, COUNT, SECURITY_GROUP, SUBNET_ID):
         InstanceType=INSTANCE_TYPE,
         KeyName=KEY_NAME,
         SecurityGroupIds=SECURITY_GROUP,
-        SubnetId = SUBNET_ID
+        SubnetId=SUBNET_ID,
     )
 
-def main(ec2_client, ec2):
+def main(ec2_client, ec2, elbv2):
 
     # CODE TO CREATE INSTANCES STARTS HERE
     # Creating 10 instances 
@@ -102,6 +103,27 @@ def main(ec2_client, ec2):
 
     return instance_ids
 
+    # create target groups
+    targetGroupT2 = elbv2.create_target_group(
+        Name="targetGroupT2",
+        Protocol='TCP',
+        Port=80,
+        VpcId=vpc_id
+    )
+    targetGroupM4 = elbv2.create_target_group(
+        Name="targetGroupM4",
+        Protocol='TCP',
+        Port=80,
+        VpcId=vpc_id
+    )
+
+    print(targetGroupT2)
+    print(targetGroupM4)
+
+    # assign instances to target groups
+
+
+
 
 def values(ec2_client, instance_ids):
     # test 
@@ -137,4 +159,4 @@ def values(ec2_client, instance_ids):
     print(ins_ids)
 
 
-main(ec2_client, ec2)
+main(ec2_client, ec2, elbv2)
