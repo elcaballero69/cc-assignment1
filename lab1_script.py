@@ -56,7 +56,7 @@ def main(ec2_client, ec2, elbv2):
         GroupId=group_id,
         IpPermissions=[{
             'FromPort': 22,
-            'ToPort': 22,
+            'ToPort': 8080,
             'IpProtocol': 'tcp',
             'IpRanges': [{'CidrIp': '0.0.0.0/0'}]
         }]
