@@ -20,6 +20,8 @@ Victor\
 ## DONE:
 - Creation of 9 instances
 - Creation of security group
+- creation of target groups
+- assigning all instances to the target groups
 
 ## LAB GOALS:
 Create  clusters using EC2 and ELB

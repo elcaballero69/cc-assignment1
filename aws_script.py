@@ -2,12 +2,10 @@
 import boto3
 import json
 import time
-import subprocess
-from multiprocessing import Pool
 
 ec2_client = boto3.client("ec2")
 ec2 = boto3.resource('ec2')
-
+elbv2 = boto3.client('elbv2')
 
 
 def createInstances(ec2, INSTANCE_TYPE, COUNT, SECURITY_GROUP, SUBNET_ID):
@@ -22,59 +20,24 @@ def createInstances(ec2, INSTANCE_TYPE, COUNT, SECURITY_GROUP, SUBNET_ID):
         InstanceType=INSTANCE_TYPE,
         KeyName=KEY_NAME,
         SecurityGroupIds=SECURITY_GROUP,
-        SubnetId = SUBNET_ID
+        SubnetId=SUBNET_ID,
     )
 
-def terminateAll(ec2_client):
-    # DOES NOT WORK YET
-    groups = ec2_client.describe_security_groups()
-    vpc_id = groups["SecurityGroups"][0]["VpcId"]
-    instance_ids = [instance.id for instance in ec2.instances]
-    instance_data_raw = ec2_client.describe_instances(InstanceIds=instance_ids)
+def main(ec2_client, ec2, elbv2):
 
-    # Get the id's of all running ec2 clients
-    ins_ids_terminate = []
-    for res_id in range(len(instance_data_raw["Reservations"])):
-        for ins_id in range(len(instance_data_raw["Reservations"][res_id]["Instances"])):
-            ins_ids_terminate.append(instance_data_raw["Reservations"][res_id]["Instances"][ins_id]["PublicIpAddress"])
-    ec2_client.terminate_instances(InstanceIds=(ins_ids_terminate))
-
-    # Wait for all instances to be terminated (else security group will not be deleted)
-    instance_terminated_waiter = ec2_client.get_waiter('instance_terminated')
-    instance_terminated_waiter.wait(InstanceIds=(ins_ids_terminate))
-
-    # Now remove the security group as well!
-    # Did not find a waiter for this
-    ec2_client.delete_security_group(
-        Description="SSH all",
-        GroupName="Cloud Computing TP1",
-        VpcId=vpc_id
-    )
-
-
-
-
-def main(ec2_client, ec2):
     # CODE TO CREATE INSTANCES STARTS HERE
-    # First remove any running instances and/or security groups
-
     # Creating 10 instances 
 
     # Create security group, using only SSH access available from anywhere
+
     groups = ec2_client.describe_security_groups()
     vpc_id = groups["SecurityGroups"][0]["VpcId"]
-
 
     new_group = ec2_client.create_security_group(
         Description="SSH all",
         GroupName="Cloud Computing TP1",
         VpcId=vpc_id
     )
-
-    # Wait for the security group to exist!
-    new_group_waiter = ec2_client.get_waiter('security_group_exists')
-    new_group_waiter.wait(GroupNames=["Cloud Computing TP1"])
-
 
     group_id = new_group["GroupId"]
 
@@ -119,67 +82,106 @@ def main(ec2_client, ec2):
     instances_m4_b = createInstances(ec2, "m4.large", 2, SECURITY_GROUP,availability_zone_1b)
     instances_t2_c = createInstances(ec2, "t2.large", 1, SECURITY_GROUP,availability_zone_1c)
 
-
-    # print(instances_t2_a)
+    print(instances_t2_a)
 
     instance_ids = []
+    T2_instance_ids = []
+    M4_instance_ids = []
 
     for instance in instances_t2_a:
         instance_ids.append(instance.id)
+        T2_instance_ids.append({'Id': instance.id})
 
     for instance in instances_m4_a:
         instance_ids.append(instance.id)
+        M4_instance_ids.append({'Id': instance.id})
 
     for instance in instances_t2_b:
         instance_ids.append(instance.id)
+        T2_instance_ids.append({'Id': instance.id})
 
     for instance in instances_m4_b:
         instance_ids.append(instance.id)
+        M4_instance_ids.append({'Id': instance.id})
 
     for instance in instances_t2_c:
         instance_ids.append(instance.id)
+        T2_instance_ids.append({'Id': instance.id})
 
-    # Wait for all instances to be active!
-    instance_running_waiter = ec2_client.get_waiter('instance_running')
-    instance_running_waiter.wait(InstanceIds=(instance_ids))
+    print(T2_instance_ids)
+    print(M4_instance_ids)
 
+    # create target groups
+    targetGroupT2 = elbv2.create_target_group(
+        Name="targetGroupT2",
+        Protocol='TCP',
+        Port=80,
+        VpcId=vpc_id
+    )
+    targetGroupM4 = elbv2.create_target_group(
+        Name="targetGroupM4",
+        Protocol='TCP',
+        Port=80,
+        VpcId=vpc_id
+    )
 
-    return instance_ids
+    print(targetGroupT2)
+    print(targetGroupM4)
+
+    # get targetGroupARN
+
+    ARN_T2=targetGroupT2['TargetGroups'][0].get('TargetGroupArn')
+    ARN_M4 = targetGroupM4['TargetGroups'][0].get('TargetGroupArn')
+
+    # assign instances to target groups
+    time.sleep(25)
+    targetgroupInstances_T2 = elbv2.register_targets(
+        TargetGroupArn=ARN_T2,
+        Targets=T2_instance_ids
+    )
+    targetgroupInstances_M4 = elbv2.register_targets(
+        TargetGroupArn=ARN_M4,
+        Targets=M4_instance_ids
+    )
+
+    print(targetgroupInstances_T2)
+    print(targetgroupInstances_M4)
+
+    #TODO create load balancer
+
 
 
 def values(ec2_client, instance_ids):
+    # test 
+    # time.sleep(10)
+    
+    """
+    ------
+    THE INSTANCES ARE CREATED AS THEY SHOULD, HOWEVER WE ARE UNABLE TO GET THE DATA FOR THEM,
+    BECAUSE THEY ARE NOT FOUND YET, SCRIPT IS TOO FAST AND AWS TOO SLOW
+    HOWEVER, WE ARE NOT SURE IF WE ACTUALLY NEED THIS, DEPENDS ON HOW WE CAN CONNECT TO THE INSTANCES
+    ------
+    """
+
+    #  list of ids : [id,id,id]
+
     instance_data_raw = ec2_client.describe_instances(InstanceIds=instance_ids)
+
+    # returns a list with a lot of paramaeters for each instance, PublicIpAddress parameter has the Public IPv4 address used for connection
+
     instance_list = instance_data_raw["Reservations"][0]["Instances"]
+    print(len(instance_list))
+
+    print(len(instance_data_raw["Reservations"]))
 
     # Example Get IP address
-    ins_ips = []
+    ins_ids = []
+
     for res_id in range(len(instance_data_raw["Reservations"])):
         for ins_id in range(len(instance_data_raw["Reservations"][res_id]["Instances"])):
-            ins_ips.append(instance_data_raw["Reservations"][res_id]["Instances"][ins_id]["PublicIpAddress"])
-    print(ins_ips)
-    return ins_ips
+            ins_ids.append(instance_data_raw["Reservations"][res_id]["Instances"][ins_id]["PublicIpAddress"])
 
-# Functions to deploy flask in parallel on the 10 instances
-def pool_subprocess(ins_ips):
-    pool = Pool()
-    results = pool.map(call_subprocess, ins_ips)
-    pool.close()
-    pool.join()
-    print(results)
-
-def call_subprocess(ins_ip):
-    subprocess.call(['sh', './lab1_flask.sh', ins_ip])
-    print(500 * "-")
-    print(str(ins_ip) + " has flask deployed!")
-
-    return True
+    print(ins_ids)
 
 
-ins_ips = values(ec2_client, main(ec2_client, ec2))
-# ins_ips = []
-# Deploy in serial manner
-# for i in ins_ips:
-#    subprocess.call(['sh', './lab1_flask.sh', i])
-
-# Deploy in parellel 
-pool_subprocess(ins_ips)
+main(ec2_client, ec2, elbv2)
