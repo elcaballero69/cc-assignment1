@@ -5,38 +5,11 @@ import time
 import subprocess
 from multiprocessing import Pool
 
-ec2_client = boto3.client("ec2")
-ec2 = boto3.resource('ec2')
-elbv2 = boto3.client('elbv2')
 
-
-
-def createInstances(ec2, INSTANCE_TYPE, COUNT, SECURITY_GROUP, SUBNET_ID):
-    # Don't change these
-    KEY_NAME = "vockey"
-    INSTANCE_IMAGE = "ami-08d4ac5b634553e16"
-
-    return ec2.create_instances(
-        ImageId=INSTANCE_IMAGE,
-        MinCount=COUNT,
-        MaxCount=COUNT,
-        InstanceType=INSTANCE_TYPE,
-        KeyName=KEY_NAME,
-        SecurityGroupIds=SECURITY_GROUP,
-        SubnetId = SUBNET_ID
-    )
-
-
-
-
-def main(ec2_client, ec2, elbv2):
-    # CODE TO CREATE INSTANCES STARTS HERE
-    # Creating 10 instances 
-
+def createSecurityGroup(ec2_client):
     # Create security group, using only SSH access available from anywhere
     groups = ec2_client.describe_security_groups()
     vpc_id = groups["SecurityGroups"][0]["VpcId"]
-
 
     new_group = ec2_client.create_security_group(
         Description="SSH all",
@@ -47,7 +20,6 @@ def main(ec2_client, ec2, elbv2):
     # Wait for the security group to exist!
     new_group_waiter = ec2_client.get_waiter('security_group_exists')
     new_group_waiter.wait(GroupNames=["Cloud Computing TP1"])
-
 
     group_id = new_group["GroupId"]
 
@@ -63,35 +35,59 @@ def main(ec2_client, ec2, elbv2):
     )
 
     SECURITY_GROUP = [group_id]
-
     print(SECURITY_GROUP)
 
-    # Availability zones
+    return SECURITY_GROUP, vpc_id
 
+
+def getAvailabilityZones(ec2_client):
+    # Availability zones
     response = ec2_client.describe_subnets()
 
     availabilityzones = {}
     for subnet in response.get('Subnets'):
-            #print(subnet)
-            availabilityzones.update({subnet.get('AvailabilityZone'): subnet.get('SubnetId')})
+        # print(subnet)
+        availabilityzones.update({subnet.get('AvailabilityZone'): subnet.get('SubnetId')})
 
-    #print(availabilityzones)
+    return availabilityzones
+
+
+def createInstance(ec2, INSTANCE_TYPE, COUNT, SECURITY_GROUP, SUBNET_ID):
+    # Don't change these
+    KEY_NAME = "vockey"
+    INSTANCE_IMAGE = "ami-08d4ac5b634553e16"
+
+    return ec2.create_instances(
+        ImageId=INSTANCE_IMAGE,
+        MinCount=COUNT,
+        MaxCount=COUNT,
+        InstanceType=INSTANCE_TYPE,
+        KeyName=KEY_NAME,
+        SecurityGroupIds=SECURITY_GROUP,
+        SubnetId=SUBNET_ID
+    )
+
+
+def createInstances(ec2_client, ec2, SECURITY_GROUP, availabilityZones):
+    # CODE TO CREATE INSTANCES STARTS HERE
+    # Creating 9 instances
 
     # Get wanted availability zone
-    availability_zone_1a = availabilityzones.get('us-east-1a')
-    availability_zone_1b = availabilityzones.get('us-east-1b')
-    availability_zone_1c = availabilityzones.get('us-east-1c')
+    availability_zone_1a = availabilityZones.get('us-east-1a')
+    availability_zone_1b = availabilityZones.get('us-east-1b')
+    availability_zone_1c = availabilityZones.get('us-east-1c')
 
     print(availability_zone_1a)
+    print(availability_zone_1b)
+    print(availability_zone_1c)
 
-    # Types: t2.large and m4.large, testing with micro
+    # Types: t2.large and m4.large
 
-    instances_t2_a = createInstances(ec2, "t2.large", 2, SECURITY_GROUP,availability_zone_1a)
-    instances_m4_a = createInstances(ec2, "m4.large", 2, SECURITY_GROUP,availability_zone_1a)
-    instances_t2_b = createInstances(ec2, "t2.large", 2, SECURITY_GROUP,availability_zone_1b)
-    instances_m4_b = createInstances(ec2, "m4.large", 2, SECURITY_GROUP,availability_zone_1b)
-    instances_t2_c = createInstances(ec2, "t2.large", 1, SECURITY_GROUP,availability_zone_1c)
-
+    instances_t2_a = createInstance(ec2, "t2.large", 2, SECURITY_GROUP, availability_zone_1a)
+    instances_m4_a = createInstance(ec2, "m4.large", 2, SECURITY_GROUP, availability_zone_1a)
+    instances_t2_b = createInstance(ec2, "t2.large", 2, SECURITY_GROUP, availability_zone_1b)
+    instances_m4_b = createInstance(ec2, "m4.large", 2, SECURITY_GROUP, availability_zone_1b)
+    instances_t2_c = createInstance(ec2, "t2.large", 1, SECURITY_GROUP, availability_zone_1c)
 
     print(instances_t2_a)
 
@@ -125,31 +121,38 @@ def main(ec2_client, ec2, elbv2):
 
     print(T2_instance_ids)
     print(M4_instance_ids)
+    print(instance_ids)
 
+    return instance_ids, T2_instance_ids, M4_instance_ids
+
+def createTargetgroup(elbv2, vpc_id, name):
+
+    return elbv2.create_target_group(
+        Name=name,
+        Protocol='TCP',
+        Port=80,
+        VpcId=vpc_id
+    )
+
+def createTargetGroups(elbv2, vpc_id):
     # create target groups
-    targetGroupT2 = elbv2.create_target_group(
-        Name="targetGroupT2",
-        Protocol='TCP',
-        Port=80,
-        VpcId=vpc_id
-    )
-    targetGroupM4 = elbv2.create_target_group(
-        Name="targetGroupM4",
-        Protocol='TCP',
-        Port=80,
-        VpcId=vpc_id
-    )
+    targetGroupT2 = createTargetgroup(elbv2, vpc_id, "targetGroupT2")
+    targetGroupM4 = createTargetgroup(elbv2, vpc_id, "targetGroupM4")
 
     print(targetGroupT2)
     print(targetGroupM4)
 
     # get targetGroupARN
-
-    ARN_T2=targetGroupT2['TargetGroups'][0].get('TargetGroupArn')
+    ARN_T2 = targetGroupT2['TargetGroups'][0].get('TargetGroupArn')
     ARN_M4 = targetGroupM4['TargetGroups'][0].get('TargetGroupArn')
 
+    return ARN_T2, ARN_M4
+
+
+def assignInstancesToTargetGroups(elbv2, ARN_T2, ARN_M4, T2_instance_ids, M4_instance_ids):
     # assign instances to target groups
-    time.sleep(25)
+    # wait for instances to be created properly
+    # time.sleep(25)
     targetgroupInstances_T2 = elbv2.register_targets(
         TargetGroupArn=ARN_T2,
         Targets=T2_instance_ids
@@ -162,9 +165,50 @@ def main(ec2_client, ec2, elbv2):
     print(targetgroupInstances_T2)
     print(targetgroupInstances_M4)
 
-    #TODO create load balancer
+    return targetgroupInstances_T2, targetgroupInstances_M4
 
-    return instance_ids
+    #TODO create load balancer
+def createLoadBalancer(elbv2, SECURITY_GROUP, availabilityZones):
+    # will most probably need more arguments
+    # need to decide what typ of load balancer it should be
+    loadBalancer=elbv2.create_load_balancer(
+        Name="Lab1LoadBalancer",
+        Subnets=[
+            availabilityZones.get('us-east-1a'),
+            availabilityZones.get('us-east-1b'),
+            availabilityZones.get('us-east-1c')
+        ],
+        SecurityGroups=SECURITY_GROUP,
+    )
+
+    print(loadBalancer)
+
+    ARN_LB = loadBalancer['LoadBalancers'][0].get('LoadBalancerArn')
+    print(ARN_LB)
+
+    return ARN_LB
+
+
+def assignTargetGroupsToLoadBalancer(elbv2, ARN_LB, ARN_T2, ARN_M4):
+    # assign target groups to load balancer
+    listener = elbv2.create_listener(
+        LoadBalancerArn=ARN_LB,
+        Port=80,
+        DefaultActions=[
+            {
+                'Type': 'forward',
+                'TargetGroupArn': ARN_T2
+            },
+            {
+                'Type': 'forward',
+                'TargetGroupArn': ARN_M4
+            }
+        ]
+    )
+
+    print(listener)
+
+    return listener
 
 
 def values(ec2_client, instance_ids):
@@ -179,7 +223,7 @@ def values(ec2_client, instance_ids):
     print(ins_ips)
     return ins_ips
 
-# Functions to deploy flask in parallel on the 10 instances
+# Functions to deploy flask
 
 def loop_subprocess(ins_ips):
     for ins_ip in ins_ips:
@@ -187,5 +231,19 @@ def loop_subprocess(ins_ips):
         print(500 * "-")
         print(str(ins_ip) + " has flask deployed!")
 
-ins_ips = values(ec2_client, main(ec2_client, ec2, elbv2))
-loop_subprocess(ins_ips)
+def main():
+    ec2_client = boto3.client("ec2")
+    ec2 = boto3.resource('ec2')
+    elbv2 = boto3.client('elbv2')
+
+    SECURITY_GROUP, vpc_id = createSecurityGroup(ec2_client)
+    availabilityZones = getAvailabilityZones(ec2_client)
+    ins_ids, T2_instance_ids, M4_instance_ids = createInstances(ec2_client, ec2, SECURITY_GROUP, availabilityZones)
+    ARN_T2, ARN_M4 = createTargetGroups(elbv2, vpc_id)
+    targetgroupInstances_T2, targetgroupInstances_M4 = assignInstancesToTargetGroups(elbv2, ARN_T2, ARN_M4, T2_instance_ids, M4_instance_ids)
+    ARN_LB = createLoadBalancer(elbv2, SECURITY_GROUP, availabilityZones)
+    listener = assignTargetGroupsToLoadBalancer(elbv2, ARN_LB, ARN_T2, ARN_M4)
+    ins_ips = values(ec2_client, ins_ids)
+    loop_subprocess(ins_ips)
+
+main()
