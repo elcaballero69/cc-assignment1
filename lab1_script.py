@@ -180,19 +180,12 @@ def values(ec2_client, instance_ids):
     return ins_ips
 
 # Functions to deploy flask in parallel on the 10 instances
-def pool_subprocess(ins_ips):
-    pool = Pool()
-    results = pool.map(call_subprocess, ins_ips)
-    pool.close()
-    pool.join()
-    print(results)
 
-def call_subprocess(ins_ip):
-    subprocess.call(['sh', './lab1_flask.sh', ins_ip])
-    print(500 * "-")
-    print(str(ins_ip) + " has flask deployed!")
-    return True
-
+def loop_subprocess(ins_ips):
+    for ins_ip in ins_ips:
+        subprocess.call(['sh', './lab1_flask.sh', ins_ip])
+        print(500 * "-")
+        print(str(ins_ip) + " has flask deployed!")
 
 ins_ips = values(ec2_client, main(ec2_client, ec2, elbv2))
-pool_subprocess(ins_ips)
+loop_subprocess(ins_ips)
