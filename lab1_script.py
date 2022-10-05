@@ -194,6 +194,7 @@ def assignTargetGroupsToLoadBalancer(elbv2, ARN_LB, ARN_T2, ARN_M4):
     listener = elbv2.create_listener(
         LoadBalancerArn=ARN_LB,
         Port=80,
+        Protocol='HTTP',
         DefaultActions=[
             {
                 'Type': 'forward',
@@ -242,8 +243,8 @@ def main():
     ARN_T2, ARN_M4 = createTargetGroups(elbv2, vpc_id)
     targetgroupInstances_T2, targetgroupInstances_M4 = assignInstancesToTargetGroups(elbv2, ARN_T2, ARN_M4, T2_instance_ids, M4_instance_ids)
     ARN_LB = createLoadBalancer(elbv2, SECURITY_GROUP, availabilityZones)
-    #listener = assignTargetGroupsToLoadBalancer(elbv2, ARN_LB, ARN_T2, ARN_M4)
+    listener = assignTargetGroupsToLoadBalancer(elbv2, ARN_LB, ARN_T2, ARN_M4)
     ins_ips = values(ec2_client, ins_ids)
-    loop_subprocess(ins_ips)
+    #loop_subprocess(ins_ips)
 
 main()
