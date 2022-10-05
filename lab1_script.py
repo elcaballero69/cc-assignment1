@@ -25,39 +25,11 @@ def createInstances(ec2, INSTANCE_TYPE, COUNT, SECURITY_GROUP, SUBNET_ID):
         SubnetId = SUBNET_ID
     )
 
-def terminateAll(ec2_client):
-    # DOES NOT WORK YET
-    groups = ec2_client.describe_security_groups()
-    vpc_id = groups["SecurityGroups"][0]["VpcId"]
-    instance_ids = [instance.id for instance in ec2.instances]
-    instance_data_raw = ec2_client.describe_instances(InstanceIds=instance_ids)
-
-    # Get the id's of all running ec2 clients
-    ins_ids_terminate = []
-    for res_id in range(len(instance_data_raw["Reservations"])):
-        for ins_id in range(len(instance_data_raw["Reservations"][res_id]["Instances"])):
-            ins_ids_terminate.append(instance_data_raw["Reservations"][res_id]["Instances"][ins_id]["PublicIpAddress"])
-    ec2_client.terminate_instances(InstanceIds=(ins_ids_terminate))
-
-    # Wait for all instances to be terminated (else security group will not be deleted)
-    instance_terminated_waiter = ec2_client.get_waiter('instance_terminated')
-    instance_terminated_waiter.wait(InstanceIds=(ins_ids_terminate))
-
-    # Now remove the security group as well!
-    # Did not find a waiter for this
-    ec2_client.delete_security_group(
-        Description="SSH all",
-        GroupName="Cloud Computing TP1",
-        VpcId=vpc_id
-    )
-
 
 
 
 def main(ec2_client, ec2):
     # CODE TO CREATE INSTANCES STARTS HERE
-    # First remove any running instances and/or security groups
-
     # Creating 10 instances 
 
     # Create security group, using only SSH access available from anywhere
@@ -176,10 +148,4 @@ def call_subprocess(ins_ip):
 
 
 ins_ips = values(ec2_client, main(ec2_client, ec2))
-# ins_ips = []
-# Deploy in serial manner
-# for i in ins_ips:
-#    subprocess.call(['sh', './lab1_flask.sh', i])
-
-# Deploy in parellel 
 pool_subprocess(ins_ips)
