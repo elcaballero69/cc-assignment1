@@ -191,7 +191,6 @@ def call_subprocess(ins_ip):
     subprocess.call(['sh', './lab1_flask.sh', ins_ip])
     print(500 * "-")
     print(str(ins_ip) + " has flask deployed!")
-
     return True
 
 
