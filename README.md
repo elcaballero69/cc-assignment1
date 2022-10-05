@@ -1,9 +1,9 @@
 # AWS LAB
 ## CURRENTLY WORKING ON:
-Aura:\
-Cedric: D\
-Nick:\
-Victor\
+Aura: \
+Cedric: \
+Nick: \
+Victor: \
 
 ## BEFORE USING: 
 - Download AWS CLI: https://aws.amazon.com/cli/
@@ -12,16 +12,19 @@ Victor\
     - Select AWS Details from menu and under "Cloud access", "AWS CLI:" click "Show"
     - Copy content to the .aws/configuration file
 - Make sure .aws/config file has following content:
-    [default]
+    [default]unnecess
     region=us-east-1
     output=json
 - Install boto3 with pip
+- Download your personal labsuser.pem file and add it to your repository
 
 ## DONE:
 - Creation of 9 instances
 - Creation of security group
-- creation of target groups
-- assigning all instances to the target groups
+- Creation of target groups
+- Assigning all instances to the target groups
+- Deploying flask on instances
+
 
 ## LAB GOALS:
 Create  clusters using EC2 and ELB
