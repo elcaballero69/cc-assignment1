@@ -7,6 +7,7 @@ from multiprocessing import Pool
 
 ec2_client = boto3.client("ec2")
 ec2 = boto3.resource('ec2')
+elbv2 = boto3.client('elbv2')
 
 
 
@@ -28,7 +29,7 @@ def createInstances(ec2, INSTANCE_TYPE, COUNT, SECURITY_GROUP, SUBNET_ID):
 
 
 
-def main(ec2_client, ec2):
+def main(ec2_client, ec2, elbv2):
     # CODE TO CREATE INSTANCES STARTS HERE
     # Creating 10 instances 
 
@@ -92,29 +93,76 @@ def main(ec2_client, ec2):
     instances_t2_c = createInstances(ec2, "t2.large", 1, SECURITY_GROUP,availability_zone_1c)
 
 
-    # print(instances_t2_a)
+    print(instances_t2_a)
 
     instance_ids = []
+    T2_instance_ids = []
+    M4_instance_ids = []
 
     for instance in instances_t2_a:
         instance_ids.append(instance.id)
+        T2_instance_ids.append({'Id': instance.id})
 
     for instance in instances_m4_a:
         instance_ids.append(instance.id)
+        M4_instance_ids.append({'Id': instance.id})
 
     for instance in instances_t2_b:
         instance_ids.append(instance.id)
+        T2_instance_ids.append({'Id': instance.id})
 
     for instance in instances_m4_b:
         instance_ids.append(instance.id)
+        M4_instance_ids.append({'Id': instance.id})
 
     for instance in instances_t2_c:
         instance_ids.append(instance.id)
+        T2_instance_ids.append({'Id': instance.id})
 
     # Wait for all instances to be active!
     instance_running_waiter = ec2_client.get_waiter('instance_running')
     instance_running_waiter.wait(InstanceIds=(instance_ids))
 
+    print(T2_instance_ids)
+    print(M4_instance_ids)
+
+    # create target groups
+    targetGroupT2 = elbv2.create_target_group(
+        Name="targetGroupT2",
+        Protocol='TCP',
+        Port=80,
+        VpcId=vpc_id
+    )
+    targetGroupM4 = elbv2.create_target_group(
+        Name="targetGroupM4",
+        Protocol='TCP',
+        Port=80,
+        VpcId=vpc_id
+    )
+
+    print(targetGroupT2)
+    print(targetGroupM4)
+
+    # get targetGroupARN
+
+    ARN_T2=targetGroupT2['TargetGroups'][0].get('TargetGroupArn')
+    ARN_M4 = targetGroupM4['TargetGroups'][0].get('TargetGroupArn')
+
+    # assign instances to target groups
+    time.sleep(25)
+    targetgroupInstances_T2 = elbv2.register_targets(
+        TargetGroupArn=ARN_T2,
+        Targets=T2_instance_ids
+    )
+    targetgroupInstances_M4 = elbv2.register_targets(
+        TargetGroupArn=ARN_M4,
+        Targets=M4_instance_ids
+    )
+
+    print(targetgroupInstances_T2)
+    print(targetgroupInstances_M4)
+
+    #TODO create load balancer
 
     return instance_ids
 
@@ -147,5 +195,5 @@ def call_subprocess(ins_ip):
     return True
 
 
-ins_ips = values(ec2_client, main(ec2_client, ec2))
+ins_ips = values(ec2_client, main(ec2_client, ec2, elbv2))
 pool_subprocess(ins_ips)
