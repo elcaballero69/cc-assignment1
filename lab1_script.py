@@ -7,12 +7,12 @@ from multiprocessing import Pool
 
 
 def createSecurityGroup(ec2_client):
-    # Create security group, using only SSH access available from anywhere
+    # Create security group, using SSH & HHTP access available from anywhere
     groups = ec2_client.describe_security_groups()
     vpc_id = groups["SecurityGroups"][0]["VpcId"]
 
     new_group = ec2_client.create_security_group(
-        Description="SSH all",
+        Description="SSH and HTTP access",
         GroupName="Cloud Computing TP1",
         VpcId=vpc_id
     )
@@ -28,7 +28,12 @@ def createSecurityGroup(ec2_client):
         GroupId=group_id,
         IpPermissions=[{
             'FromPort': 22,
-            'ToPort': 8080,
+            'ToPort': 22,
+            'IpProtocol': 'tcp',
+            'IpRanges': [{'CidrIp': '0.0.0.0/0'}]
+        },{
+            'FromPort': 80,
+            'ToPort': 80,
             'IpProtocol': 'tcp',
             'IpRanges': [{'CidrIp': '0.0.0.0/0'}]
         }]
@@ -245,6 +250,6 @@ def main():
     ARN_LB = createLoadBalancer(elbv2, SECURITY_GROUP, availabilityZones)
     listener = assignTargetGroupsToLoadBalancer(elbv2, ARN_LB, ARN_T2, ARN_M4)
     ins_ips = values(ec2_client, ins_ids)
-    #loop_subprocess(ins_ips)
+    loop_subprocess(ins_ips)
 
 main()
