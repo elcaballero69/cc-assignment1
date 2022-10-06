@@ -1,0 +1,1 @@
+python3 lab1_script.py

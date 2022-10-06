@@ -36,6 +36,11 @@ def createSecurityGroup(ec2_client):
             'ToPort': 80,
             'IpProtocol': 'tcp',
             'IpRanges': [{'CidrIp': '0.0.0.0/0'}]
+        },{
+            'FromPort': 8080,
+            'ToPort': 8080,
+            'IpProtocol': 'tcp',
+            'IpRanges': [{'CidrIp': '0.0.0.0/0'}]
         }]
     )
 
@@ -232,8 +237,10 @@ def values(ec2_client, instance_ids):
 # Functions to deploy flask
 
 def loop_subprocess(ins_ips):
+    counter = 0
     for ins_ip in ins_ips:
-        subprocess.call(['sh', './lab1_flask.sh', ins_ip])
+        counter += 1
+        subprocess.call(['sh', './lab1_flask.sh', ins_ip, str(counter)])
         print(500 * "-")
         print(str(ins_ip) + " has flask deployed!")
 
@@ -245,10 +252,10 @@ def main():
     SECURITY_GROUP, vpc_id = createSecurityGroup(ec2_client)
     availabilityZones = getAvailabilityZones(ec2_client)
     ins_ids, T2_instance_ids, M4_instance_ids = createInstances(ec2_client, ec2, SECURITY_GROUP, availabilityZones)
-    ARN_T2, ARN_M4 = createTargetGroups(elbv2, vpc_id)
-    targetgroupInstances_T2, targetgroupInstances_M4 = assignInstancesToTargetGroups(elbv2, ARN_T2, ARN_M4, T2_instance_ids, M4_instance_ids)
-    ARN_LB = createLoadBalancer(elbv2, SECURITY_GROUP, availabilityZones)
-    listener = assignTargetGroupsToLoadBalancer(elbv2, ARN_LB, ARN_T2, ARN_M4)
+    # ARN_T2, ARN_M4 = createTargetGroups(elbv2, vpc_id)
+    # targetgroupInstances_T2, targetgroupInstances_M4 = assignInstancesToTargetGroups(elbv2, ARN_T2, ARN_M4, T2_instance_ids, M4_instance_ids)
+    # ARN_LB = createLoadBalancer(elbv2, SECURITY_GROUP, availabilityZones)
+    # listener = assignTargetGroupsToLoadBalancer(elbv2, ARN_LB, ARN_T2, ARN_M4)
     ins_ips = values(ec2_client, ins_ids)
     loop_subprocess(ins_ips)
 

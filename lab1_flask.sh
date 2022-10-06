@@ -1,34 +1,33 @@
+chmod 600 labsuser.pem
 ssh -o "StrictHostKeyChecking no" $1
 ssh -i labsuser.pem ubuntu@$1 << REALEND
-# Do the necessary installations for flask
+# Always update first
 sudo apt-get update
-# Install python, pip, flask, nginx and gunicorn3
-sudo apt-get install python3
-# sudo apt-get install python3 -V
+# Install venv, used to create virtual environment
 yes | sudo apt-get install python3-venv
 mkdir flask_app && cd flask_app
+# Activating venv, now entering venv 'virtual environment'
 python3 -m venv venv
 source venv/bin/activate
+# Install flask
 pip install flask
-python -m flask --version
-
-# vi flask_app.py
-# Make flask application - it is opened automatically
-# TODO give each instance a unique ID and include this in the return statement!
-
+# Write a small python script
 cat <<EOF >flask_app.py
 from flask import Flask
 app = Flask(__name__)
 @app.route('/')
-def hello():
-    return 'Hello, World from ' + str($1)
+def flask_app():
+    return 'Hello, World from ' + str($2)
+# This is needed to run on port 80, else flask will run on 5000
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8080)
+    app.run(host='0.0.0.0', port=80)
 EOF
-# To execute above code 
-# export flask_app=flask_app.py
-# flask run
-python3 flask_app.pyecho yes | 
+# Authbind
+sudo apt install authbind
+sudo touch /etc/authbind/byport/80
+sudo chmod 777 /etc/authbind/byport/80
+# Now deploy the flask application
+# authbind -deep flask --app flask_app run --host 0.0.0.0 --port 80 &
+authbind --deep python3 flask_app.py
 
-# change the security group to Custom TCP and port rangr 8080 and source 0.0.0.0/0
 REALEND
