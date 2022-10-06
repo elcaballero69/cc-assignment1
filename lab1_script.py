@@ -5,6 +5,29 @@ import time
 import subprocess
 from multiprocessing import Pool
 
+userdata="""#!/bin/bash
+cd /home/ubuntu
+mkdir flask_app
+sudo apt-get update
+yes | sudo apt-get install python3-venv
+cd flask_app
+python3 -m venv venv
+source venv/bin/activate
+pip install flask
+pip install ec2_metadata
+cat <<EOF >flask_app.py
+from flask import Flask
+from ec2_metadata import ec2_metadata
+app = Flask(__name__)
+@app.route('/')
+def flask_app():
+    return 'Hello, World from ' + ec2_metadata.instance_id
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=80)
+EOF
+flask --app flask_app run --host 0.0.0.0 --port 80
+"""
+
 
 def createSecurityGroup(ec2_client):
     # Create security group, using SSH & HHTP access available from anywhere
@@ -61,7 +84,6 @@ def getAvailabilityZones(ec2_client):
 
     return availabilityzones
 
-
 def createInstance(ec2, INSTANCE_TYPE, COUNT, SECURITY_GROUP, SUBNET_ID):
     # Don't change these
     KEY_NAME = "vockey"
@@ -74,7 +96,8 @@ def createInstance(ec2, INSTANCE_TYPE, COUNT, SECURITY_GROUP, SUBNET_ID):
         InstanceType=INSTANCE_TYPE,
         KeyName=KEY_NAME,
         SecurityGroupIds=SECURITY_GROUP,
-        SubnetId=SUBNET_ID
+        SubnetId=SUBNET_ID,
+        UserData=userdata
     )
 
 
@@ -91,13 +114,20 @@ def createInstances(ec2_client, ec2, SECURITY_GROUP, availabilityZones):
     print(availability_zone_1b)
     print(availability_zone_1c)
 
-    # Types: t2.large and m4.large
+    # Types: t2.large and m4.large use these for demo
 
-    instances_t2_a = createInstance(ec2, "t2.large", 2, SECURITY_GROUP, availability_zone_1a)
-    instances_m4_a = createInstance(ec2, "m4.large", 2, SECURITY_GROUP, availability_zone_1a)
-    instances_t2_b = createInstance(ec2, "t2.large", 2, SECURITY_GROUP, availability_zone_1b)
-    instances_m4_b = createInstance(ec2, "m4.large", 2, SECURITY_GROUP, availability_zone_1b)
-    instances_t2_c = createInstance(ec2, "t2.large", 1, SECURITY_GROUP, availability_zone_1c)
+    # instances_t2_a = createInstance(ec2, "t2.large", 2, SECURITY_GROUP, availability_zone_1a)
+    # instances_m4_a = createInstance(ec2, "m4.large", 2, SECURITY_GROUP, availability_zone_1a)
+    # instances_t2_b = createInstance(ec2, "t2.large", 2, SECURITY_GROUP, availability_zone_1b)
+    # instances_m4_b = createInstance(ec2, "m4.large", 2, SECURITY_GROUP, availability_zone_1b)
+    # instances_t2_c = createInstance(ec2, "t2.large", 1, SECURITY_GROUP, availability_zone_1c)
+
+    # Use this for development
+    instances_t2_a = createInstance(ec2, "t2.micro", 2, SECURITY_GROUP, availability_zone_1a)
+    instances_m4_a = createInstance(ec2, "t2.nano", 2, SECURITY_GROUP, availability_zone_1a)
+    instances_t2_b = createInstance(ec2, "t2.micro", 2, SECURITY_GROUP, availability_zone_1b)
+    instances_m4_b = createInstance(ec2, "t2.nano", 2, SECURITY_GROUP, availability_zone_1b)
+    instances_t2_c = createInstance(ec2, "t2.micro", 1, SECURITY_GROUP, availability_zone_1c)
 
     print(instances_t2_a)
 
@@ -124,6 +154,78 @@ def createInstances(ec2_client, ec2, SECURITY_GROUP, availabilityZones):
     for instance in instances_t2_c:
         instance_ids.append(instance.id)
         T2_instance_ids.append({'Id': instance.id})
+
+    # Wait for all instances to be active!
+    instance_running_waiter = ec2_client.get_waiter('instance_running')
+    instance_running_waiter.wait(InstanceIds=(instance_ids))
+
+    print(T2_instance_ids)
+    print(M4_instance_ids)
+    print(instance_ids)
+
+    return instance_ids, T2_instance_ids, M4_instance_ids
+
+
+def createInstance2(ec2_client, ec2, INSTANCE_TYPE, COUNT, SECURITY_GROUP, SUBNET_ID):
+    # Don't change these
+    KEY_NAME = "vockey"
+    INSTANCE_IMAGE = "ami-08d4ac5b634553e16"
+
+    return ec2_client.run_instances(
+        ImageId=INSTANCE_IMAGE,
+        MinCount=COUNT,
+        MaxCount=COUNT,
+        Monitoring={'Enabled':True},
+        InstanceType=INSTANCE_TYPE,
+        KeyName=KEY_NAME,
+        SecurityGroupIds=SECURITY_GROUP,
+        SubnetId=SUBNET_ID,
+        UserData=userdata
+    )
+
+
+def createInstances2(ec2_client, ec2, SECURITY_GROUP, availabilityZones):
+    # CODE TO CREATE INSTANCES STARTS HERE
+    # Creating 9 instances
+
+    # Get wanted availability zone
+    availability_zone_1a = availabilityZones.get('us-east-1a')
+    availability_zone_1b = availabilityZones.get('us-east-1b')
+    availability_zone_1c = availabilityZones.get('us-east-1c')
+
+    print(availability_zone_1a)
+    print(availability_zone_1b)
+    print(availability_zone_1c)
+
+    # Types: t2.large and m4.large
+
+    instances_t2_a = createInstance(ec2_client, ec2, "t2.large", 2, SECURITY_GROUP, availability_zone_1a)
+    instances_m4_a = createInstance(ec2_client, ec2, "m4.large", 2, SECURITY_GROUP, availability_zone_1a)
+    instances_t2_b = createInstance(ec2_client, ec2, "t2.large", 2, SECURITY_GROUP, availability_zone_1b)
+    instances_m4_b = createInstance(ec2_client, ec2, "m4.large", 2, SECURITY_GROUP, availability_zone_1b)
+    instances_t2_c = createInstance(ec2_client, ec2, "t2.large", 1, SECURITY_GROUP, availability_zone_1c)
+
+    print(instances_t2_a)
+
+    instance_ids = []
+    T2_instance_ids = []
+    M4_instance_ids = []
+
+    for instance in instances_t2_a['Instances']:
+        instance_ids.append(instance['InstanceId'])
+        T2_instance_ids.append({'Id': instance['InstanceId']})
+    for instance in instances_m4_a['Instances']:
+        instance_ids.append(instance['InstanceId'])
+        M4_instance_ids.append({'Id': instance['InstanceId']})
+    for instance in instances_t2_b['Instances']:
+        instance_ids.append(instance['InstanceId'])
+        T2_instance_ids.append({'Id': instance['InstanceId']})
+    for instance in instances_m4_b['Instances']:
+        instance_ids.append(instance['InstanceId'])
+        M4_instance_ids.append({'Id': instance['InstanceId']})
+    for instance in instances_t2_c['Instances']:
+        instance_ids.append(instance['InstanceId'])
+        T2_instance_ids.append({'Id': instance['InstanceId']})
 
     # Wait for all instances to be active!
     instance_running_waiter = ec2_client.get_waiter('instance_running')
@@ -252,6 +354,7 @@ def loop_subprocess(ins_ips):
         print(500 * "-")
         print(str(ins_ip) + " has flask deployed!")
 
+
 def main():
     ec2_client = boto3.client("ec2")
     ec2 = boto3.resource('ec2')
@@ -265,6 +368,6 @@ def main():
     # ARN_LB = createLoadBalancer(elbv2, SECURITY_GROUP, availabilityZones)
     # listener = assignTargetGroupsToLoadBalancer(elbv2, ARN_LB, ARN_T2, ARN_M4)
     ins_ips = values(ec2_client, ins_ids)
-    loop_subprocess(ins_ips)
+    #loop_subprocess(ins_ips)
 
 main()
