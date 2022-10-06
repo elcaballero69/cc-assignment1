@@ -207,13 +207,21 @@ def assignTargetGroupsToLoadBalancer(elbv2, ARN_LB, ARN_T2, ARN_M4):
         Protocol='HTTP',
         DefaultActions=[
             {
+                'Order': 1,
                 'Type': 'forward',
-                'TargetGroupArn': ARN_T2
+                'ForwardConfig': {
+                    'TargetGroups': [
+                        {
+                            'TargetGroupArn': ARN_T2,
+                            'Weight': 123
+                        },
+                        {
+                            'TargetGroupArn': ARN_M4,
+                            'Weight': 123
+                        },
+                    ]
+                }
             },
-            {
-                'Type': 'forward',
-                'TargetGroupArn': ARN_M4
-            }
         ]
     )
 
