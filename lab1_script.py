@@ -68,7 +68,7 @@ def createSecurityGroup(ec2_client):
     )
 
     SECURITY_GROUP = [group_id]
-    print(SECURITY_GROUP)
+    print("security_group: ", SECURITY_GROUP)
 
     return SECURITY_GROUP, vpc_id
 
@@ -110,9 +110,9 @@ def createInstances(ec2_client, ec2, SECURITY_GROUP, availabilityZones):
     availability_zone_1b = availabilityZones.get('us-east-1b')
     availability_zone_1c = availabilityZones.get('us-east-1c')
 
-    print(availability_zone_1a)
-    print(availability_zone_1b)
-    print(availability_zone_1c)
+    print("availability zone 1a: ", availability_zone_1a)
+    print("availability zone 1b: ", availability_zone_1b)
+    print("availability zone 1c: ", availability_zone_1c)
 
     # Types: t2.large and m4.large use these for demo
 
@@ -159,9 +159,9 @@ def createInstances(ec2_client, ec2, SECURITY_GROUP, availabilityZones):
     instance_running_waiter = ec2_client.get_waiter('instance_running')
     instance_running_waiter.wait(InstanceIds=(instance_ids))
 
-    print(T2_instance_ids)
-    print(M4_instance_ids)
-    print(instance_ids)
+    print("T2_instance_ids", T2_instance_ids)
+    print("M4_instance_ids", M4_instance_ids)
+    print("instance_ids", instance_ids)
 
     return instance_ids, T2_instance_ids, M4_instance_ids
 
@@ -193,9 +193,9 @@ def createInstances2(ec2_client, ec2, SECURITY_GROUP, availabilityZones):
     availability_zone_1b = availabilityZones.get('us-east-1b')
     availability_zone_1c = availabilityZones.get('us-east-1c')
 
-    print(availability_zone_1a)
-    print(availability_zone_1b)
-    print(availability_zone_1c)
+    print("availability zone 1a: ", availability_zone_1a)
+    print("availability zone 1b: ", availability_zone_1b)
+    print("availability zone 1c: ", availability_zone_1c)
 
     # Types: t2.large and m4.large
 
@@ -214,15 +214,19 @@ def createInstances2(ec2_client, ec2, SECURITY_GROUP, availabilityZones):
     for instance in instances_t2_a['Instances']:
         instance_ids.append(instance['InstanceId'])
         T2_instance_ids.append({'Id': instance['InstanceId']})
+
     for instance in instances_m4_a['Instances']:
         instance_ids.append(instance['InstanceId'])
         M4_instance_ids.append({'Id': instance['InstanceId']})
+
     for instance in instances_t2_b['Instances']:
         instance_ids.append(instance['InstanceId'])
         T2_instance_ids.append({'Id': instance['InstanceId']})
+
     for instance in instances_m4_b['Instances']:
         instance_ids.append(instance['InstanceId'])
         M4_instance_ids.append({'Id': instance['InstanceId']})
+
     for instance in instances_t2_c['Instances']:
         instance_ids.append(instance['InstanceId'])
         T2_instance_ids.append({'Id': instance['InstanceId']})
@@ -231,9 +235,9 @@ def createInstances2(ec2_client, ec2, SECURITY_GROUP, availabilityZones):
     instance_running_waiter = ec2_client.get_waiter('instance_running')
     instance_running_waiter.wait(InstanceIds=(instance_ids))
 
-    print(T2_instance_ids)
-    print(M4_instance_ids)
-    print(instance_ids)
+    print("T2_instance_ids", T2_instance_ids)
+    print("M4_instance_ids", M4_instance_ids)
+    print("instance_ids", instance_ids)
 
     return instance_ids, T2_instance_ids, M4_instance_ids
 
@@ -241,7 +245,7 @@ def createTargetgroup(elbv2, vpc_id, name):
 
     return elbv2.create_target_group(
         Name=name,
-        Protocol='TCP',
+        Protocol='HTTP',
         Port=80,
         VpcId=vpc_id
     )
@@ -251,8 +255,8 @@ def createTargetGroups(elbv2, vpc_id):
     targetGroupT2 = createTargetgroup(elbv2, vpc_id, "targetGroupT2")
     targetGroupM4 = createTargetgroup(elbv2, vpc_id, "targetGroupM4")
 
-    print(targetGroupT2)
-    print(targetGroupM4)
+    print("Target group T2: ", targetGroupT2)
+    print("Target group M4: ", targetGroupM4)
 
     # get targetGroupARN
     ARN_T2 = targetGroupT2['TargetGroups'][0].get('TargetGroupArn')
@@ -274,8 +278,8 @@ def assignInstancesToTargetGroups(elbv2, ARN_T2, ARN_M4, T2_instance_ids, M4_ins
         Targets=M4_instance_ids
     )
 
-    print(targetgroupInstances_T2)
-    print(targetgroupInstances_M4)
+    print("target group Instances_T2: ", targetgroupInstances_T2)
+    print("target group Instances_M4: ", targetgroupInstances_M4)
 
     return targetgroupInstances_T2, targetgroupInstances_M4
 
@@ -293,42 +297,40 @@ def createLoadBalancer(elbv2, SECURITY_GROUP, availabilityZones):
         SecurityGroups=SECURITY_GROUP,
     )
 
-    print(loadBalancer)
+    print("Load Balancer: ", loadBalancer)
 
     ARN_LB = loadBalancer['LoadBalancers'][0].get('LoadBalancerArn')
-    print(ARN_LB)
+    print("Load Balancer ARN: ", ARN_LB)
 
     return ARN_LB
 
 
 def assignTargetGroupsToLoadBalancer(elbv2, ARN_LB, ARN_T2, ARN_M4):
     # assign target groups to load balancer
+
     listener = elbv2.create_listener(
-        LoadBalancerArn=ARN_LB,
-        Port=80,
-        Protocol='HTTP',
-        DefaultActions=[
-            {
-                'Order': 1,
-                'Type': 'forward',
-                'ForwardConfig': {
-                    'TargetGroups': [
-                        {
-                            'TargetGroupArn': ARN_T2,
-                            'Weight': 123
-                        },
-                        {
-                            'TargetGroupArn': ARN_M4,
-                            'Weight': 123
-                        },
-                    ]
+            LoadBalancerArn=ARN_LB,
+            Port=80,
+            Protocol='HTTP',
+            DefaultActions=[
+                {
+                    'ForwardConfig': {
+                        'TargetGroups': [
+                            {
+                                'TargetGroupArn': ARN_T2,
+                                'Weight': 1
+                            },
+                            {
+                                'TargetGroupArn': ARN_M4,
+                                'Weight': 1
+                            }
+                        ]
+                    },
+                    'Type': 'forward'
                 }
-            },
-        ]
-    )
-
-    print(listener)
-
+            ]
+        )
+    print("listener: ", listener)
     return listener
 
 
@@ -341,7 +343,7 @@ def values(ec2_client, instance_ids):
     for res_id in range(len(instance_data_raw["Reservations"])):
         for ins_id in range(len(instance_data_raw["Reservations"][res_id]["Instances"])):
             ins_ips.append(instance_data_raw["Reservations"][res_id]["Instances"][ins_id]["PublicIpAddress"])
-    print(ins_ips)
+    print("Instance IP adresses: ", ins_ips)
     return ins_ips
 
 # Functions to deploy flask
@@ -363,11 +365,11 @@ def main():
     SECURITY_GROUP, vpc_id = createSecurityGroup(ec2_client)
     availabilityZones = getAvailabilityZones(ec2_client)
     ins_ids, T2_instance_ids, M4_instance_ids = createInstances(ec2_client, ec2, SECURITY_GROUP, availabilityZones)
-    # ARN_T2, ARN_M4 = createTargetGroups(elbv2, vpc_id)
-    # targetgroupInstances_T2, targetgroupInstances_M4 = assignInstancesToTargetGroups(elbv2, ARN_T2, ARN_M4, T2_instance_ids, M4_instance_ids)
-    # ARN_LB = createLoadBalancer(elbv2, SECURITY_GROUP, availabilityZones)
-    # listener = assignTargetGroupsToLoadBalancer(elbv2, ARN_LB, ARN_T2, ARN_M4)
-    ins_ips = values(ec2_client, ins_ids)
+    ARN_T2, ARN_M4 = createTargetGroups(elbv2, vpc_id)
+    targetgroupInstances_T2, targetgroupInstances_M4 = assignInstancesToTargetGroups(elbv2, ARN_T2, ARN_M4, T2_instance_ids, M4_instance_ids)
+    ARN_LB = createLoadBalancer(elbv2, SECURITY_GROUP, availabilityZones)
+    listener_T2, listener_M4 = assignTargetGroupsToLoadBalancer(elbv2, ARN_LB, ARN_T2, ARN_M4)
+    # ins_ips = values(ec2_client, ins_ids)
     #loop_subprocess(ins_ips)
 
 main()
