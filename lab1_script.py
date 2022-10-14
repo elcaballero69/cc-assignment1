@@ -330,6 +330,38 @@ def assignTargetGroupsToLoadBalancer(elbv2, ARN_LB, ARN_T2, ARN_M4):
                 }
             ]
         )
+    # Create rule T2
+    rule_T2 = elbv2.create_rule(
+        ListenerArn=listener
+        Conditions=[{
+            'Field': 'path-pattern',
+            'PathPatternConfig': {
+                'Values': ['T2', 'listener_T2']
+            }
+        }]
+        Priority=1
+        Actions=[
+            {'Type'= 'forward',
+            'TargetGroupArn': ARN_T2}
+        ]
+    )
+
+    # Create rule M4
+    rule_T2 = elbv2.create_rule(
+        ListenerArn=listener
+        Conditions=[{
+            'Field': 'path-pattern',
+            'Values': [],
+            'PathPatternConfig': {
+                'Values': ['M4', 'listener_M2']
+            }
+        }]
+        Priority=1
+        Actions=[
+            {'Type'= 'forward',
+            'TargetGroupArn': ARN_M4}
+        ]
+    )
     print("listener: ", listener)
     return listener
 
