@@ -330,40 +330,25 @@ def assignTargetGroupsToLoadBalancer(elbv2, ARN_LB, ARN_T2, ARN_M4):
                 }
             ]
         )
-    # Create rule T2
-    rule_T2 = elbv2.create_rule(
-        ListenerArn=listener
-        Conditions=[{
-            'Field': 'path-pattern',
-            'PathPatternConfig': {
-                'Values': ['T2', 'listener_T2']
-            }
-        }]
-        Priority=1
-        Actions=[
-            {'Type'= 'forward',
-            'TargetGroupArn': ARN_T2}
-        ]
-    )
 
-    # Create rule M4
-    rule_T2 = elbv2.create_rule(
-        ListenerArn=listener
-        Conditions=[{
-            'Field': 'path-pattern',
-            'Values': [],
-            'PathPatternConfig': {
-                'Values': ['M4', 'listener_M2']
-            }
-        }]
-        Priority=1
-        Actions=[
-            {'Type'= 'forward',
-            'TargetGroupArn': ARN_M4}
-        ]
-    )
     print("listener: ", listener)
     return listener
+
+make_rule(listener, ARN):
+    rule = elbv2.create_rule(
+        ListenerArn=listener['ListenerArn']
+        Conditions=[{
+            'Field': 'path-pattern',
+            'PathPatternConfig': {
+                'Values': [ARN]
+            }
+        }]
+        Priority=1
+        Actions=[
+            {'Type'= 'forward',
+            'TargetGroupArn': ARN}
+        ]
+    )
 
 
 def values(ec2_client, instance_ids):
@@ -401,6 +386,8 @@ def main():
     targetgroupInstances_T2, targetgroupInstances_M4 = assignInstancesToTargetGroups(elbv2, ARN_T2, ARN_M4, T2_instance_ids, M4_instance_ids)
     ARN_LB = createLoadBalancer(elbv2, SECURITY_GROUP, availabilityZones)
     listener_T2, listener_M4 = assignTargetGroupsToLoadBalancer(elbv2, ARN_LB, ARN_T2, ARN_M4)
+    make_rule(listener_T2, ARN_T2)
+    make_rule(listener_M4, ARN_M4)
     # ins_ips = values(ec2_client, ins_ids)
     #loop_subprocess(ins_ips)
 
