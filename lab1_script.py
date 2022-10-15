@@ -24,7 +24,7 @@ from ec2_metadata import ec2_metadata
 app = Flask(__name__)
 @app.route('/')
 def flask_app():
-    return 'Hello, World from ' + ec2_metadata.instance_id
+    return 'Hello, World from ' + ec2_metadata.instance_id + ' which is a ' ec2_metadata.instance_type + ' instance'
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=80)
 EOF
@@ -324,6 +324,7 @@ def assignTargetGroupsToLoadBalancer(elbv2, ARN_LB, ARN_T2, ARN_M4):
             LoadBalancerArn=ARN_LB,
             Port=80,
             Protocol='HTTP',
+            #create default listener
             DefaultActions=[
                 {
                     'ForwardConfig': {
@@ -371,6 +372,7 @@ def make_rule(elbv2, ARN_Listener, ARN, priority, path):
         ]
     )
     print("rule:", rule)
+
     return rule
 
 def getCloudWatchMetrics(cw, startTime, ARN_targetgroup):
@@ -431,7 +433,6 @@ def call_endpoint_http(DNS_LB, cluster):
     url = "http://"+ DNS_LB + "?cluster=" + cluster
     headers = {'content-type': 'application/json'}
     r = requests.get(url, headers=headers)
-    print(r.status_code)
     print(r.content)
 
 
@@ -454,10 +455,22 @@ def main():
     ARN_Listener = assignTargetGroupsToLoadBalancer(elbv2, ARN_LB, ARN_T2, ARN_M4)
     make_rule(elbv2, ARN_Listener, ARN_T2, 1, 'cl2')
     make_rule(elbv2, ARN_Listener, ARN_M4, 2, 'cl1')
+
+    #wait until load balancer is available
+    print('WAITING FOR AVAILABILITY OF LOAD BALANCER...')
+    lb_waiter = elbv2.get_waiter('load_balancer_available')
+    lb_waiter.wait(LoadBalancerArns=[ARN_LB])
     ins_ips = values(ec2_client, ins_ids)
-    #TODO: load balancer requires long initialization time. Thus, connection error
-    #call_endpoint_http(DNS_LB, 'cl1')
-    #call_endpoint_http(DNS_LB, 'cl2')
+
+    #request the flask server
+    print('REQUESTS ARE RUNNNING')
+    for i in range(0,100):
+        print(f'REQUEST {i}')
+        call_endpoint_http(DNS_LB, 'cl1')
+        call_endpoint_http(DNS_LB, 'cl2')
+        time.sleep(5)
+    print('REQUESTS TERMINATED')
+
     data_T2 = getCloudWatchMetrics(cw, startTime, ARN_T2)
     data_M4 = getCloudWatchMetrics(cw, startTime, ARN_M4)
 
