@@ -158,7 +158,6 @@ def createInstances(ec2_client, ec2, SECURITY_GROUP, availabilityZones):
         T2_instance_ids.append({'Id': instance.id})
 
     # Wait for all instances to be active!
-    print("waiting for instanses to activate")
     instance_running_waiter = ec2_client.get_waiter('instance_running')
     instance_running_waiter.wait(InstanceIds=(instance_ids))
 
@@ -235,7 +234,6 @@ def createInstances2(ec2_client, ec2, SECURITY_GROUP, availabilityZones):
         T2_instance_ids.append({'Id': instance['InstanceId']})
 
     # Wait for all instances to be active!
-    print("waiting for instanses to activate")
     instance_running_waiter = ec2_client.get_waiter('instance_running')
     instance_running_waiter.wait(InstanceIds=(instance_ids))
 
@@ -336,26 +334,31 @@ def assignTargetGroupsToLoadBalancer(elbv2, ARN_LB, ARN_T2, ARN_M4):
         )
 
     print("listener: ", listener)
-    return listener
+    ARN_Listener = listener['Listeners'][0].get('ListenerArn')
+    print("listener_ARN:", ARN_Listener)
 
-def make_rule(elbv2, listener, ARN):
+    return ARN_Listener
+
+
+def make_rule(elbv2, ARN_Listener, ARN, priority):
     rule = elbv2.create_rule(
-        ListenerArn=listener['ListenerArn'],
+        ListenerArn=ARN_Listener,
         Conditions=[{
             'Field': 'path-pattern',
             'PathPatternConfig': {
                 'Values': [ARN]
             }
         }],
-        Priority=1,
+        Priority=priority,
         Actions=[
             {'Type': 'forward',
             'TargetGroupArn': ARN}
         ]
     )
+    print("rule:", rule)
     return rule
 
-def getCloudWatchMetrics(cw, startTime):
+def getCloudWatchMetrics(cw, startTime, ARN_targetgroup):
     # check which metrics we want to retrieve
     # https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-cloudwatch-metrics.html
     data = cw.get_metric_data(
@@ -364,21 +367,28 @@ def getCloudWatchMetrics(cw, startTime):
                 'Id': 'cloudwatchdata',
                 'MetricStat': {
                     'Metric': {
+                        'Namespace': 'AWS/ApplicationELB',
                         'MetricName': 'HealthyHostCount',
+                        'Dimensions': [
+                            {
+                                'Name': 'TargetGroup',
+                                'Value': 'string'
+                            },
+                        ]
                     },
                     'Period': 5,
-                    'Stat': 'sum',
+                    'Stat': 'Minimum',
                 }
             },
         ],
-        startTime=startTime,
-        endTime=datetime.now(),
+        StartTime=startTime,
+        EndTime=datetime.now(),
         ScanBy='TimestampAscending',
     )
 
-    print(data)
-
+    print("cloudwatch data: ", data)
     return data
+
 
 def values(ec2_client, instance_ids):
     instance_data_raw = ec2_client.describe_instances(InstanceIds=instance_ids)
@@ -408,7 +418,7 @@ def main():
     ec2_client = boto3.client("ec2")
     ec2 = boto3.resource('ec2')
     elbv2 = boto3.client('elbv2')
-    cw = boto3.clien('cloudwatch')
+    cw = boto3.client('cloudwatch')
 
     startTime = datetime.now()
     SECURITY_GROUP, vpc_id = createSecurityGroup(ec2_client)
@@ -417,11 +427,11 @@ def main():
     ARN_T2, ARN_M4 = createTargetGroups(elbv2, vpc_id)
     targetgroupInstances_T2, targetgroupInstances_M4 = assignInstancesToTargetGroups(elbv2, ARN_T2, ARN_M4, T2_instance_ids, M4_instance_ids)
     ARN_LB = createLoadBalancer(elbv2, SECURITY_GROUP, availabilityZones)
-    listener_T2, listener_M4 = assignTargetGroupsToLoadBalancer(elbv2, ARN_LB, ARN_T2, ARN_M4)
-    make_rule(elbv2, listener_T2, ARN_T2)
-    make_rule(elbv2, listener_M4, ARN_M4)
-    # ins_ips = values(ec2_client, ins_ids)
+    ARN_Listener = assignTargetGroupsToLoadBalancer(elbv2, ARN_LB, ARN_T2, ARN_M4)
+    make_rule(elbv2, ARN_Listener, ARN_T2, 1)
+    make_rule(elbv2, ARN_Listener, ARN_M4, 2)
     #loop_subprocess(ins_ips)
-    data = getCloudWatchMetrics(cw, startTime)
+    data_T2 = getCloudWatchMetrics(cw, startTime, ARN_T2)
+    data_M4 = getCloudWatchMetrics(cw, startTime, ARN_M4)
 
 main()
