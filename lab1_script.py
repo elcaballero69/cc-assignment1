@@ -354,10 +354,15 @@ def make_rule(elbv2, ARN_Listener, ARN, priority, path):
     rule = elbv2.create_rule(
         ListenerArn=ARN_Listener,
         Conditions=[{
-            'Field': 'path-pattern',
-            'PathPatternConfig': {
-                'Values': [path]
-            }
+            'Field': 'query-string',
+            'QueryStringConfig': {
+                'Values': [
+                    {
+                        'Key': 'cluster',
+                        'Value': path
+                   }
+                ]
+            },
         }],
         Priority=priority,
         Actions=[
@@ -423,11 +428,11 @@ def loop_subprocess(ins_ips):
         print(str(ins_ip) + " has flask deployed!")
 
 def call_endpoint_http(DNS_LB, cluster):
-    url = "http://"+ DNS_LB + "/" + cluster
+    url = "http://"+ DNS_LB + "?cluster=" + cluster
     headers = {'content-type': 'application/json'}
     r = requests.get(url, headers=headers)
     print(r.status_code)
-    print(r.json())
+    print(r.content)
 
 
 
@@ -447,11 +452,12 @@ def main():
     targetgroupInstances_T2, targetgroupInstances_M4 = assignInstancesToTargetGroups(elbv2, ARN_T2, ARN_M4, T2_instance_ids, M4_instance_ids)
     DNS_LB, ARN_LB = createLoadBalancer(elbv2, SECURITY_GROUP, availabilityZones)
     ARN_Listener = assignTargetGroupsToLoadBalancer(elbv2, ARN_LB, ARN_T2, ARN_M4)
-    make_rule(elbv2, ARN_Listener, ARN_T2, 1, '/cluster2')
-    make_rule(elbv2, ARN_Listener, ARN_M4, 2, '/cluster1')
+    make_rule(elbv2, ARN_Listener, ARN_T2, 1, 'cl2')
+    make_rule(elbv2, ARN_Listener, ARN_M4, 2, 'cl1')
     ins_ips = values(ec2_client, ins_ids)
-    call_endpoint_http(DNS_LB, 'cluster1')
-    call_endpoint_http(DNS_LB, 'cluster2')
+    #TODO: load balancer requires long initialization time. Thus, connection error
+    #call_endpoint_http(DNS_LB, 'cl1')
+    #call_endpoint_http(DNS_LB, 'cl2')
     data_T2 = getCloudWatchMetrics(cw, startTime, ARN_T2)
     data_M4 = getCloudWatchMetrics(cw, startTime, ARN_M4)
 
