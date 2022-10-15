@@ -3,6 +3,7 @@ import boto3
 import json
 import time
 import subprocess
+import requests
 from multiprocessing import Pool
 from datetime import date
 from datetime import datetime
@@ -254,8 +255,8 @@ def createTargetgroup(elbv2, vpc_id, name):
 
 def createTargetGroups(elbv2, vpc_id):
     # create target groups
-    targetGroupT2 = createTargetgroup(elbv2, vpc_id, "targetGroupT2")
-    targetGroupM4 = createTargetgroup(elbv2, vpc_id, "targetGroupM4")
+    targetGroupT2 = createTargetgroup(elbv2, vpc_id, "cluster2")
+    targetGroupM4 = createTargetgroup(elbv2, vpc_id, "cluster1")
 
     print("Target group T2: ", targetGroupT2)
     print("Target group M4: ", targetGroupM4)
@@ -279,13 +280,17 @@ def assignInstancesToTargetGroups(elbv2, ARN_T2, ARN_M4, T2_instance_ids, M4_ins
         TargetGroupArn=ARN_M4,
         Targets=M4_instance_ids
     )
+    health = elbv2.describe_target_groups(
+        TargetGroupArns=[ARN_T2, ARN_M4]
+    )
 
-    print("target group Instances_T2: ", targetgroupInstances_T2)
-    print("target group Instances_M4: ", targetgroupInstances_M4)
-
+    print("target group Instances_T2: \n", targetgroupInstances_T2)
+    print("target group Instances_M4: \n", targetgroupInstances_M4)
+    # For now only print
+    print("Health: \n", health)
     return targetgroupInstances_T2, targetgroupInstances_M4
 
-    #TODO create load balancer
+
 def createLoadBalancer(elbv2, SECURITY_GROUP, availabilityZones):
     # will most probably need more arguments
     # need to decide what typ of load balancer it should be
@@ -297,14 +302,19 @@ def createLoadBalancer(elbv2, SECURITY_GROUP, availabilityZones):
             availabilityZones.get('us-east-1c')
         ],
         SecurityGroups=SECURITY_GROUP,
+        Scheme='internet-facing',
+        Type='application',
+        IpAddressType='ipv4'
     )
 
-    print("Load Balancer: ", loadBalancer)
-
+    print("Load Balancer: \n", loadBalancer)
+    DNS_LB = loadBalancer['LoadBalancers'][0].get('DNSName')
     ARN_LB = loadBalancer['LoadBalancers'][0].get('LoadBalancerArn')
+    print("Load Balancer dns: ", DNS_LB)
     print("Load Balancer ARN: ", ARN_LB)
+    return DNS_LB, ARN_LB
 
-    return ARN_LB
+
 
 
 def assignTargetGroupsToLoadBalancer(elbv2, ARN_LB, ARN_T2, ARN_M4):
@@ -340,13 +350,13 @@ def assignTargetGroupsToLoadBalancer(elbv2, ARN_LB, ARN_T2, ARN_M4):
     return ARN_Listener
 
 
-def make_rule(elbv2, ARN_Listener, ARN, priority):
+def make_rule(elbv2, ARN_Listener, ARN, priority, path):
     rule = elbv2.create_rule(
         ListenerArn=ARN_Listener,
         Conditions=[{
             'Field': 'path-pattern',
             'PathPatternConfig': {
-                'Values': [ARN]
+                'Values': [path]
             }
         }],
         Priority=priority,
@@ -376,7 +386,7 @@ def getCloudWatchMetrics(cw, startTime, ARN_targetgroup):
                             },
                         ]
                     },
-                    'Period': 5,
+                    'Period': 1,
                     'Stat': 'Minimum',
                 }
             },
@@ -412,6 +422,15 @@ def loop_subprocess(ins_ips):
         print(500 * "-")
         print(str(ins_ip) + " has flask deployed!")
 
+def call_endpoint_http(DNS_LB, cluster):
+    url = "http://"+ DNS_LB + "/" + cluster
+    headers = {'content-type': 'application/json'}
+    r = requests.get(url, headers=headers)
+    print(r.status_code)
+    print(r.json())
+
+
+
 
 
 def main():
@@ -426,11 +445,13 @@ def main():
     ins_ids, T2_instance_ids, M4_instance_ids = createInstances(ec2_client, ec2, SECURITY_GROUP, availabilityZones)
     ARN_T2, ARN_M4 = createTargetGroups(elbv2, vpc_id)
     targetgroupInstances_T2, targetgroupInstances_M4 = assignInstancesToTargetGroups(elbv2, ARN_T2, ARN_M4, T2_instance_ids, M4_instance_ids)
-    ARN_LB = createLoadBalancer(elbv2, SECURITY_GROUP, availabilityZones)
+    DNS_LB, ARN_LB = createLoadBalancer(elbv2, SECURITY_GROUP, availabilityZones)
     ARN_Listener = assignTargetGroupsToLoadBalancer(elbv2, ARN_LB, ARN_T2, ARN_M4)
-    make_rule(elbv2, ARN_Listener, ARN_T2, 1)
-    make_rule(elbv2, ARN_Listener, ARN_M4, 2)
-    #loop_subprocess(ins_ips)
+    make_rule(elbv2, ARN_Listener, ARN_T2, 1, '/cluster2')
+    make_rule(elbv2, ARN_Listener, ARN_M4, 2, '/cluster1')
+    ins_ips = values(ec2_client, ins_ids)
+    call_endpoint_http(DNS_LB, 'cluster1')
+    call_endpoint_http(DNS_LB, 'cluster2')
     data_T2 = getCloudWatchMetrics(cw, startTime, ARN_T2)
     data_M4 = getCloudWatchMetrics(cw, startTime, ARN_M4)
 
