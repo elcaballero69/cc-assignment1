@@ -4,6 +4,8 @@ import json
 import time
 import subprocess
 from multiprocessing import Pool
+from datetime import date
+from datetime import datetime
 
 userdata="""#!/bin/bash
 cd /home/ubuntu
@@ -129,7 +131,7 @@ def createInstances(ec2_client, ec2, SECURITY_GROUP, availabilityZones):
     instances_m4_b = createInstance(ec2, "t2.nano", 2, SECURITY_GROUP, availability_zone_1b)
     instances_t2_c = createInstance(ec2, "t2.micro", 1, SECURITY_GROUP, availability_zone_1c)
 
-    print(instances_t2_a)
+    print("t2 instanses zone a: ", instances_t2_a)
 
     instance_ids = []
     T2_instance_ids = []
@@ -156,6 +158,7 @@ def createInstances(ec2_client, ec2, SECURITY_GROUP, availabilityZones):
         T2_instance_ids.append({'Id': instance.id})
 
     # Wait for all instances to be active!
+    print("waiting for instanses to activate")
     instance_running_waiter = ec2_client.get_waiter('instance_running')
     instance_running_waiter.wait(InstanceIds=(instance_ids))
 
@@ -205,7 +208,7 @@ def createInstances2(ec2_client, ec2, SECURITY_GROUP, availabilityZones):
     instances_m4_b = createInstance(ec2_client, ec2, "m4.large", 2, SECURITY_GROUP, availability_zone_1b)
     instances_t2_c = createInstance(ec2_client, ec2, "t2.large", 1, SECURITY_GROUP, availability_zone_1c)
 
-    print(instances_t2_a)
+    print("T2 instances for availability zone a: ", instances_t2_a)
 
     instance_ids = []
     T2_instance_ids = []
@@ -232,6 +235,7 @@ def createInstances2(ec2_client, ec2, SECURITY_GROUP, availabilityZones):
         T2_instance_ids.append({'Id': instance['InstanceId']})
 
     # Wait for all instances to be active!
+    print("waiting for instanses to activate")
     instance_running_waiter = ec2_client.get_waiter('instance_running')
     instance_running_waiter.wait(InstanceIds=(instance_ids))
 
@@ -334,22 +338,47 @@ def assignTargetGroupsToLoadBalancer(elbv2, ARN_LB, ARN_T2, ARN_M4):
     print("listener: ", listener)
     return listener
 
-make_rule(listener, ARN):
+def make_rule(elbv2, listener, ARN):
     rule = elbv2.create_rule(
-        ListenerArn=listener['ListenerArn']
+        ListenerArn=listener['ListenerArn'],
         Conditions=[{
             'Field': 'path-pattern',
             'PathPatternConfig': {
                 'Values': [ARN]
             }
-        }]
-        Priority=1
+        }],
+        Priority=1,
         Actions=[
-            {'Type'= 'forward',
+            {'Type': 'forward',
             'TargetGroupArn': ARN}
         ]
     )
+    return rule
 
+def getCloudWatchMetrics(cw, startTime):
+    # check which metrics we want to retrieve
+    # https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-cloudwatch-metrics.html
+    data = cw.get_metric_data(
+        MetricDataQueries=[
+            {
+                'Id': 'cloudwatchdata',
+                'MetricStat': {
+                    'Metric': {
+                        'MetricName': 'HealthyHostCount',
+                    },
+                    'Period': 5,
+                    'Stat': 'sum',
+                }
+            },
+        ],
+        startTime=startTime,
+        endTime=datetime.now(),
+        ScanBy='TimestampAscending',
+    )
+
+    print(data)
+
+    return data
 
 def values(ec2_client, instance_ids):
     instance_data_raw = ec2_client.describe_instances(InstanceIds=instance_ids)
@@ -374,11 +403,14 @@ def loop_subprocess(ins_ips):
         print(str(ins_ip) + " has flask deployed!")
 
 
+
 def main():
     ec2_client = boto3.client("ec2")
     ec2 = boto3.resource('ec2')
     elbv2 = boto3.client('elbv2')
+    cw = boto3.clien('cloudwatch')
 
+    startTime = datetime.now()
     SECURITY_GROUP, vpc_id = createSecurityGroup(ec2_client)
     availabilityZones = getAvailabilityZones(ec2_client)
     ins_ids, T2_instance_ids, M4_instance_ids = createInstances(ec2_client, ec2, SECURITY_GROUP, availabilityZones)
@@ -386,9 +418,10 @@ def main():
     targetgroupInstances_T2, targetgroupInstances_M4 = assignInstancesToTargetGroups(elbv2, ARN_T2, ARN_M4, T2_instance_ids, M4_instance_ids)
     ARN_LB = createLoadBalancer(elbv2, SECURITY_GROUP, availabilityZones)
     listener_T2, listener_M4 = assignTargetGroupsToLoadBalancer(elbv2, ARN_LB, ARN_T2, ARN_M4)
-    make_rule(listener_T2, ARN_T2)
-    make_rule(listener_M4, ARN_M4)
+    make_rule(elbv2, listener_T2, ARN_T2)
+    make_rule(elbv2, listener_M4, ARN_M4)
     # ins_ips = values(ec2_client, ins_ids)
     #loop_subprocess(ins_ips)
+    data = getCloudWatchMetrics(cw, startTime)
 
 main()
