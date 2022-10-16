@@ -390,20 +390,17 @@ def getCloudWatchMetrics(cw, startTime, ARN_targetgroup, name, ARN_LB):
                 'MetricStat': {
                     'Metric': {
                         'Namespace': 'AWS/ApplicationELB',
-                        'MetricName': 'HealthyHostCount',
+                        'MetricName': 'RequestCount',
                         'Dimensions': [
                             {
                                 'Name': 'LoadBalancer',
-                                'Value': ARN_LB
-                            },
-                            {
-                                'Name': 'TargetGroup',
-                                'Value': name
+                                'Value': ARN_LB.split(':')[-1].split("loadbalancer/")[-1]
                             }
                         ]
                     },
-                    'Period': 1,
-                    'Stat': 'Average',
+                    'Period': 3000,
+                    'Stat': 'Sum',
+                    'Unit': 'Count'
                 }
             },
         ],
