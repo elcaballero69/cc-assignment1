@@ -6,7 +6,7 @@ import subprocess
 import requests
 from multiprocessing import Pool
 from datetime import date
-from datetime import datetime
+from datetime import datetime, timedelta
 
 userdata="""#!/bin/bash
 cd /home/ubuntu
@@ -57,12 +57,14 @@ def createSecurityGroup(ec2_client):
             'ToPort': 22,
             'IpProtocol': 'tcp',
             'IpRanges': [{'CidrIp': '0.0.0.0/0'}]
-        },{
+        },
+        {
             'FromPort': 80,
             'ToPort': 80,
             'IpProtocol': 'tcp',
             'IpRanges': [{'CidrIp': '0.0.0.0/0'}]
-        },{
+        },
+        {
             'FromPort': 8080,
             'ToPort': 8080,
             'IpProtocol': 'tcp',
@@ -375,9 +377,12 @@ def make_rule(elbv2, ARN_Listener, ARN, priority, path):
 
     return rule
 
-def getCloudWatchMetrics(cw, startTime, ARN_targetgroup):
+def getCloudWatchMetrics(cw, startTime, ARN_targetgroup, name, ARN_LB):
     # check which metrics we want to retrieve
     # https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-cloudwatch-metrics.html
+    print("Start Time:", startTime)
+    endTime = datetime.utcnow()
+    print("End Time:", endTime)
     data = cw.get_metric_data(
         MetricDataQueries=[
             {
@@ -388,24 +393,47 @@ def getCloudWatchMetrics(cw, startTime, ARN_targetgroup):
                         'MetricName': 'HealthyHostCount',
                         'Dimensions': [
                             {
-                                'Name': 'TargetGroup',
-                                'Value': 'string'
+                                'Name': 'LoadBalancer',
+                                'Value': ARN_LB
                             },
+                            {
+                                'Name': 'TargetGroup',
+                                'Value': name
+                            }
                         ]
                     },
                     'Period': 1,
-                    'Stat': 'Minimum',
+                    'Stat': 'Average',
                 }
             },
         ],
         StartTime=startTime,
-        EndTime=datetime.now(),
+        EndTime=endTime,
         ScanBy='TimestampAscending',
     )
 
     print("cloudwatch data: ", data)
     return data
 
+def createPolicy(iam):
+
+    my_policy = {
+      "Version": "2012-10-17",
+      "Statement": [{
+          "Effect": "Allow",
+          "Action":
+              ["cloudwatch:GetMetricData"],
+          "Resource": "*"
+        }]
+    }
+
+    policy = iam.create_policy(
+        PolicyName='CloudwatchPolicy',
+        PolicyDocument=json.dumps(my_policy)
+    )
+
+    print("policy:", policy)
+    return policy
 
 def values(ec2_client, instance_ids):
     instance_data_raw = ec2_client.describe_instances(InstanceIds=instance_ids)
@@ -443,10 +471,12 @@ def main():
     ec2_client = boto3.client("ec2")
     ec2 = boto3.resource('ec2')
     elbv2 = boto3.client('elbv2')
-    cw = boto3.client('cloudwatch')
+    cw = boto3.client('cloudwatch', region_name='us-east-1')
+    iam = boto3.client('iam')
 
-    startTime = datetime.now()
+    startTime = datetime.utcnow()
     SECURITY_GROUP, vpc_id = createSecurityGroup(ec2_client)
+    policy = createPolicy(iam)
     availabilityZones = getAvailabilityZones(ec2_client)
     ins_ids, T2_instance_ids, M4_instance_ids = createInstances(ec2_client, ec2, SECURITY_GROUP, availabilityZones)
     ARN_T2, ARN_M4 = createTargetGroups(elbv2, vpc_id)
@@ -464,14 +494,14 @@ def main():
 
     #request the flask server
     print('REQUESTS ARE RUNNNING')
-    for i in range(0,100):
+    for i in range(0, 10):
         print(f'REQUEST {i}')
         call_endpoint_http(DNS_LB, 'cl1')
         call_endpoint_http(DNS_LB, 'cl2')
         time.sleep(5)
     print('REQUESTS TERMINATED')
 
-    data_T2 = getCloudWatchMetrics(cw, startTime, ARN_T2)
-    data_M4 = getCloudWatchMetrics(cw, startTime, ARN_M4)
+    data_T2 = getCloudWatchMetrics(cw, startTime, ARN_T2, "cluster2", ARN_LB)
+    data_M4 = getCloudWatchMetrics(cw, startTime, ARN_M4, "cluster1", ARN_LB)
 
 main()
