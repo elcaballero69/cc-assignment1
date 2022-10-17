@@ -7,6 +7,7 @@ import requests
 from multiprocessing import Pool
 from datetime import date
 from datetime import datetime, timedelta
+import matplotlib.pyplot as plt
 
 userdata="""#!/bin/bash
 cd /home/ubuntu
@@ -464,8 +465,13 @@ def call_endpoint_http(DNS_LB, cluster):
     print(r.content)
 
 
+def plotData(Data):
+    values = Data['MetricDataResults'][0].get('Values')
+    print("Values:", values)
 
-
+    plt.plot(values)
+    plt.ylabel('un healhy hosts')
+    plt.show()
 
 def main():
     ec2_client = boto3.client("ec2")
@@ -503,5 +509,7 @@ def main():
 
     data_T2 = getCloudWatchMetrics(cw, startTime, ARN_T2, "cluster2", ARN_LB)
     data_M4 = getCloudWatchMetrics(cw, startTime, ARN_M4, "cluster1", ARN_LB)
+
+    plotData(data_T2)
 
 main()

@@ -7,6 +7,7 @@ import requests
 from multiprocessing import Pool
 from datetime import date
 from datetime import datetime, timedelta
+import matplotlib.pyplot as plt
 
 """
 {'Namespace': 'AWS/ApplicationELB', 
@@ -112,11 +113,19 @@ def getCloudWatchMetrics(cw, startTime, ARN_targetgroup, name, ARN_LB):
     print("----------------------------------------")
     return data
 
+def plotData(Data):
+    values = Data['MetricDataResults'][0].get('Values')
+    print("Values:", values)
+
+    plt.plot(values)
+    plt.ylabel('un healhy hosts')
+    plt.show()
+
 cw = boto3.client("cloudwatch")
 startTime = datetime.today()
-ARN_T2 = "arn:aws:elasticloadbalancing:us-east-1:547173889923:targetgroup/cluster2/adbe5ac03e1f7509"
-ARN_M4 = "arn:aws:elasticloadbalancing:us-east-1:547173889923:targetgroup/cluster1/c1e62f08981da494"
-ARN_LB = "arn:aws:elasticloadbalancing:us-east-1:547173889923:loadbalancer/app/Lab1LoadBalancer/f9c86917f947d8d6"
+ARN_T2 = "arn:aws:elasticloadbalancing:us-east-1:547173889923:targetgroup/cluster2/a555c98e76559864"
+ARN_M4 = "arn:aws:elasticloadbalancing:us-east-1:547173889923:targetgroup/cluster1/dc5bc79321f4200e"
+ARN_LB = "arn:aws:elasticloadbalancing:us-east-1:547173889923:loadbalancer/app/Lab1LoadBalancer/3bde909379102fc7"
 
 response = cw.list_metrics()
 for each_metric in response['Metrics']:
@@ -126,6 +135,8 @@ for each_metric in response['Metrics']:
 
 data_T2 = getCloudWatchMetrics(cw, startTime, ARN_T2, "cluster2", ARN_LB)
 data_M4 = getCloudWatchMetrics(cw, startTime, ARN_M4, "cluster1", ARN_LB)
+
+plotData(data_T2)
 
 
 """
