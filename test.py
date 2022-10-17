@@ -113,12 +113,30 @@ def getCloudWatchMetrics(cw, startTime, ARN_targetgroup, name, ARN_LB):
     print("----------------------------------------")
     return data
 
-def plotData(Data):
-    values = Data['MetricDataResults'][0].get('Values')
-    print("Values:", values)
+def plotData(data_t2, data_m4):
+    values_t2 = data_t2['MetricDataResults'][0].get('Values')
+    time_t2 = data_t2['MetricDataResults'][0].get('Timestamps')
+    print("Values:", values_t2)
 
-    plt.plot(values)
-    plt.ylabel('un healhy hosts')
+    values_m4 = data_m4['MetricDataResults'][0].get('Values')
+    time_m4 = data_m4['MetricDataResults'][0].get('Timestamps')
+    print("Values:", values_t2)
+
+    plt.subplot(1, 2, 1)
+    plt.plot(time_m4, values_m4)
+    plt.ylabel('Unhealhy Hosts')
+    plt.xlabel('Timestamp')
+    plt.yticks([0, 1, 2, 3, 4, 5, 6])
+    plt.title("Cluster 1, M4.Large")
+
+    plt.subplot(1, 2, 2)
+    plt.plot(time_t2, values_t2)
+    plt.ylabel('Unhealhy Hosts')
+    plt.xlabel('Timestamp')
+    plt.yticks([0, 1, 2, 3, 4, 5, 6])
+    plt.title("Cluster 2, T2.Large")
+
+
     plt.show()
 
 cw = boto3.client("cloudwatch")
@@ -136,7 +154,8 @@ for each_metric in response['Metrics']:
 data_T2 = getCloudWatchMetrics(cw, startTime, ARN_T2, "cluster2", ARN_LB)
 data_M4 = getCloudWatchMetrics(cw, startTime, ARN_M4, "cluster1", ARN_LB)
 
-plotData(data_T2)
+plotData(data_T2, data_M4)
+
 
 
 """
