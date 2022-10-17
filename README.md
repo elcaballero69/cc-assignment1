@@ -15,7 +15,7 @@ Victor: \
     [default]unnecess
     region=us-east-1
     output=json
-- Install boto3 with pip
+- Install boto3, matplotlib, requests and tornado with pip
 - Download your personal labsuser.pem file and add it to your repository
 
 ## DONE:
