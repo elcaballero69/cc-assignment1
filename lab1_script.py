@@ -38,7 +38,6 @@ EOF
 flask --app flask_app run --host 0.0.0.0 --port 80
 """
 
-
 def createSecurityGroup(ec2_client):
     # Create security group, using SSH & HHTP access available from anywhere
     groups = ec2_client.describe_security_groups()
@@ -81,7 +80,6 @@ def createSecurityGroup(ec2_client):
 
     SECURITY_GROUP = [group_id]
     return SECURITY_GROUP, vpc_id
-
 
 def getAvailabilityZones(ec2_client):
     # Availability zones
@@ -263,8 +261,6 @@ def make_rule(elbv2, ARN_Listener, ARN, priority, path):
             'TargetGroupArn': ARN}
         ]
     )
-    # print("rule:", rule)
-
     return rule
 
 def getCloudWatchMetrics(cw, startTime, ARN_targetgroup, name, ARN_LB):
@@ -292,8 +288,8 @@ def getCloudWatchMetrics(cw, startTime, ARN_targetgroup, name, ARN_LB):
                             }
                         ]
                     },
-                    'Period': 1,
-                    'Stat': 'Average',
+                    'Period': 60,
+                    'Stat': 'Maximum',
                 }
             },
         ],
@@ -306,7 +302,6 @@ def getCloudWatchMetrics(cw, startTime, ARN_targetgroup, name, ARN_LB):
     return data
 
 def createPolicy(iam):
-
     my_policy = {
       "Version": "2012-10-17",
       "Statement": [{
@@ -356,8 +351,9 @@ def plotData(data_t2, data_m4):
     plt.yticks([0, 1, 2, 3, 4, 5, 6])
     plt.title("Cluster 2, T2.Large")
 
-
     plt.show()
+
+
 
 def main():
     # Get necesarry clients from boto3
@@ -412,13 +408,12 @@ def main():
     webbrowser.open(DNS_LB + '?cluster=cl2')
     # Request the flask server
     print('REQUESTS ARE RUNNNING')
-    for i in range(0, 10):
+    for i in range(0, 1200):
         print(f'REQUEST {i}')
         call_endpoint_http(DNS_LB, 'cl1')
         call_endpoint_http(DNS_LB, 'cl2')
-        time.sleep(5)
+        time.sleep(0.1)
     print('REQUESTS TERMINATED')
-
     data_T2 = getCloudWatchMetrics(cw, startTime, ARN_T2, "cluster2", ARN_LB)
     data_M4 = getCloudWatchMetrics(cw, startTime, ARN_M4, "cluster1", ARN_LB)
     plotData(data_T2, data_M4)
