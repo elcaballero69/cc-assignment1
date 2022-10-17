@@ -390,17 +390,20 @@ def getCloudWatchMetrics(cw, startTime, ARN_targetgroup, name, ARN_LB):
                 'MetricStat': {
                     'Metric': {
                         'Namespace': 'AWS/ApplicationELB',
-                        'MetricName': 'RequestCount',
+                        'MetricName': 'UnHealthyHostCount',
                         'Dimensions': [
+                            {
+                                'Name': 'TargetGroup',
+                                'Value': ARN_targetgroup.split(':')[-1]
+                            },
                             {
                                 'Name': 'LoadBalancer',
                                 'Value': ARN_LB.split(':')[-1].split("loadbalancer/")[-1]
                             }
                         ]
                     },
-                    'Period': 3000,
-                    'Stat': 'Sum',
-                    'Unit': 'Count'
+                    'Period': 1,
+                    'Stat': 'Average',
                 }
             },
         ],
@@ -468,7 +471,7 @@ def main():
     ec2_client = boto3.client("ec2")
     ec2 = boto3.resource('ec2')
     elbv2 = boto3.client('elbv2')
-    cw = boto3.client('cloudwatch', region_name='us-east-1')
+    cw = boto3.client('cloudwatch')
     iam = boto3.client('iam')
 
     startTime = datetime.utcnow()
