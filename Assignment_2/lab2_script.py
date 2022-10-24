@@ -92,6 +92,7 @@ def getAvailabilityZones(ec2_client):
 
     return availabilityzones
 
+
 def createInstance(ec2, INSTANCE_TYPE, COUNT, SECURITY_GROUP, SUBNET_ID):
     # Don't change these
     KEY_NAME = "vockey"
@@ -112,7 +113,7 @@ def createInstances(ec2_client, ec2, SECURITY_GROUP, availabilityZones):
     # Get wanted availability zone
     availability_zone_1a = availabilityZones.get('us-east-1a')
 
-    # Use this for development
+    """Use this for development to save funds"""
     # instances_m4_a = createInstance(ec2, "m4.nano", 1, SECURITY_GROUP, availability_zone_1a)
     
     # Use m4.large for deployment/demo
@@ -120,8 +121,7 @@ def createInstances(ec2_client, ec2, SECURITY_GROUP, availabilityZones):
 
     instance_ids = []
 
-    for instance in instances_m4_a:
-        instance_ids.append(instance.id)
+    instance_ids.append(instances_m4_a.id)
 
     # Wait for all instances to be active!
     instance_running_waiter = ec2_client.get_waiter('instance_running')
@@ -130,49 +130,39 @@ def createInstances(ec2_client, ec2, SECURITY_GROUP, availabilityZones):
     return instance_ids
 
 
-def createPolicy(iam):
-    my_policy = {
-      "Version": "2012-10-17",
-      "Statement": [{
-          "Effect": "Allow",
-          "Action":
-              ["cloudwatch:GetMetricData"],
-          "Resource": "*"
-        }]
-    }
-
-    policy = iam.create_policy(
-        PolicyName='CloudwatchPolicy',
-        PolicyDocument=json.dumps(my_policy)
-    )
-
-    # print("policy:", policy)
-    return policy
-
-
 
 def main():
-    # Get necesarry clients from boto3
+    """------------Get necesarry clients from boto3------------------------"""
     ec2_client = boto3.client("ec2")
     ec2 = boto3.resource('ec2')
     elbv2 = boto3.client('elbv2')
     cw = boto3.client('cloudwatch')
     iam = boto3.client('iam')
-    startTime = datetime.utcnow()
-    # Create security group
+
+    """-------------------Create security group--------------------------"""
     SECURITY_GROUP, vpc_id = createSecurityGroup(ec2_client)
     print("security_group: ", SECURITY_GROUP)
     print("vpc_id: ", str(vpc_id), "\n")
-    # Create policy
-    policy = createPolicy(iam)
-    print("Cloud watch policy created \n")
-    # Get availability Zones
+
+    """-------------------Get availability Zones--------------------------"""
     availabilityZones = getAvailabilityZones(ec2_client)
     print("Availability zones:")
     print("Zone 1a: ", availabilityZones.get('us-east-1a'), "\n")
-    # Create the instances
+
+    """-------------------Create the instances--------------------------"""
     ins_ids = createInstances(ec2_client, ec2, SECURITY_GROUP, availabilityZones)
     print("Instance ids: \n", str(ins_ids), "\n")
-    # Create the target groups
+
+    """-------------------Run Wordcount experiment--------------------------"""
+
+    """-------------------Get output--------------------------"""
+
+    """-------------------plot and compare--------------------------"""
+
+    """-------------------Write MapReduce program--------------------------"""
+
+    """-------------------Run Recomendation System--------------------------"""
+
+
 
 main()
