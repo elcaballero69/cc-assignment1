@@ -9,33 +9,33 @@ import requests
 from multiprocessing import Pool
 from datetime import date
 from datetime import datetime, timedelta
-import matplotlib.pyplot as plt
-import matplotlib as mpl
-import webbrowser
+# import matplotlib.pyplot as plt
+# import matplotlib as mpl
+# import webbrowser
 
 # This makes the plots made by the script open in a webbrowser
-mpl.use('WebAgg')
+# mpl.use('WebAgg')
 userdata="""#!/bin/bash
 cd /home/ubuntu
-mkdir flask_app
 sudo apt-get update
-yes | sudo apt-get install python3-venv
-cd flask_app
-python3 -m venv venv
-source venv/bin/activate
-pip install flask
-pip install ec2_metadata
-cat <<EOF >flask_app.py
-from flask import Flask
-from ec2_metadata import ec2_metadata
-app = Flask(__name__)
-@app.route('/')
-def flask_app():
-    return 'Hello, World from ' + ec2_metadata.instance_id
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=80)
+yes | sudo apt install openjdk-11-jdk-headless
+sudo apt-get install wget
+wget https://dlcdn.apache.org/hadoop/common/stable/hadoop-3.3.4.tar.gz
+sudo tar -xf hadoop-3.3.4.tar.gz -C /usr/local/
+cat << EOF >> .profile
+#!/bin/sh
+export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
+export PATH=\$JAVA_HOME/bin:\$PATH
+#!/bin/sh
+export HADOOP_PREFIX=/usr/local/hadoop-3.3.4
+export PATH=\$HADOOP_PREFIX/bin:\$PATH
 EOF
-flask --app flask_app run --host 0.0.0.0 --port 80
+sudo chmod ugo+rw /usr/local/hadoop-3.3.4/etc/hadoop/hadoop-env.sh
+cat << EOF >> /usr/local/hadoop-3.3.4/etc/hadoop/hadoop-env.sh
+# export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
+# export HADOOP_PREFIX=/usr/local/hadoop-3.3.4
+EOF
+source .profile
 """
 
 def createSecurityGroup(ec2_client):
@@ -51,12 +51,12 @@ def createSecurityGroup(ec2_client):
 
     # Wait for the security group to exist!
     new_group_waiter = ec2_client.get_waiter('security_group_exists')
-    new_group_waiter.wait(GroupNames=["Cloud Computing TP1"])
+    new_group_waiter.wait(GroupNames=["Cloud Computing TP2"])
 
     group_id = new_group["GroupId"]
 
     rule_creation = ec2_client.authorize_security_group_ingress(
-        GroupName="Cloud Computing TP1",
+        GroupName="Cloud Computing TP2",
         GroupId=group_id,
         IpPermissions=[{
             'FromPort': 22,
@@ -115,13 +115,13 @@ def createInstances(ec2_client, ec2, SECURITY_GROUP, availabilityZones):
 
     """Use this for development to save funds"""
     # instances_m4_a = createInstance(ec2, "m4.nano", 1, SECURITY_GROUP, availability_zone_1a)
-    
+
     # Use m4.large for deployment/demo
     instances_m4_a = createInstance(ec2, "m4.large", 1, SECURITY_GROUP, availability_zone_1a)
 
     instance_ids = []
 
-    instance_ids.append(instances_m4_a.id)
+    instance_ids.append(instances_m4_a[0].id)
 
     # Wait for all instances to be active!
     instance_running_waiter = ec2_client.get_waiter('instance_running')
