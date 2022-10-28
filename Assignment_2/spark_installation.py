@@ -16,9 +16,6 @@ source ~/.profile
 sudo apt install python3-pip | ENTER
 pip install urllib3
 pip install pandas
-
-
-
 """
 
 # second export must be entered manually
@@ -34,28 +31,10 @@ pip install pandas
 # Can be used for the wordcountproblem
 '''
 import urllib3
+import pandas as pd
 http = urllib3.PoolManager()
-r = http.request('GET', 'http://www.gutenberg.ca/ebooks/buchanj-midwinter/buchanj-midwinter-00-t.txt')
-content = r.data.decode('latin-1')
-content = content.replace('\n',' ')
-#print(content)
 
-#parellize to receive RDD
-rdd = sc.parallelize(content.split(' '))
-#x is key & 1 is value
-rdd = rdd.map(lambda x: (x,1))
-#increase value if k is already prevalent & sort by key
-rdd = rdd.reduceByKey(lambda x,y: x + y).sortByKey()
-
-# change position of value and key & sort descending by values
-#rdd = rdd.map(lambda x:(x[1],x[0])).sortByKey(False)
-
-df = rdd.toDF(['Count','Word']).toPandas()
-df = df.sort_values('Word', axis=0, ascending = False)
-
-'''
-
-links = ['http://www.gutenberg.ca/ebooks/buchanj-midwinter/buchanj-midwinter-00-t.txt',
+LINKS = ['http://www.gutenberg.ca/ebooks/buchanj-midwinter/buchanj-midwinter-00-t.txt',
          'http://www.gutenberg.ca/ebooks/carman-farhorizons/carman-farhorizons-00-t.txt',
          'http://www.gutenberg.ca/ebooks/colby-champlain/colby-champlain-00-t.txt',
          'http://www.gutenberg.ca/ebooks/cheyneyp-darkbahama/cheyneyp-darkbahama-00-t.txt',
@@ -65,3 +44,16 @@ links = ['http://www.gutenberg.ca/ebooks/buchanj-midwinter/buchanj-midwinter-00-
          'http://www.gutenberg.ca/ebooks/delamare-myfanwy/delamare-myfanwy-00-t.txt',
          'http://www.gutenberg.ca/ebooks/delamare-penny/delamare-penny-00-t.txt'
          ]
+
+result = pd.DataFrame()
+       
+for link in LINKS:
+    r = http.request('GET', link)
+    content = r.data.decode('latin-1')
+    content = content.replace('\n',' ')
+    rdd = sc.parallelize(content.split(' '))
+    rdd = rdd.map(lambda x: (x,1))
+    rdd = rdd.reduceByKey(lambda x,y: x + y).sortByKey()
+    df = rdd.toDF(['Word', f'Count_Link{str(LINKS.index(link))}']).toPandas().sort_values(f'Count_Link{str(LINKS.index(link))}', axis=0, ascending = False).set_index('Word')
+    result = pd.concat([result, df], axis=1)
+'''
