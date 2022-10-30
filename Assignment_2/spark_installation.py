@@ -8,7 +8,7 @@ cd ..
 cd ..
 cat << EOF >> .profile
 export SPARK_HOME=/opt/spark
-export PATH=$PATH:$SPARK_HOME/bin:$SPARK_HOME/sbin
+export PATH=\$PATH:\$SPARK_HOME/bin:\$SPARK_HOME/sbin
 export PYSPARK_PYTHON=/usr/bin/python3
 EOF
 source ~/.profile
@@ -46,7 +46,7 @@ LINKS = ['http://www.gutenberg.ca/ebooks/buchanj-midwinter/buchanj-midwinter-00-
          ]
 
 result = pd.DataFrame()
-       
+
 for link in LINKS:
     r = http.request('GET', link)
     content = r.data.decode('latin-1')
