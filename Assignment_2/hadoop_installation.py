@@ -27,5 +27,5 @@ gunzip -kv pg4300.txt.gz
 { time cat pg4300.txt | tr ' ' '\n' | sort | uniq -c  ; } 2> time_linux.txt
 hdfs dfs -mkdir input
 hdfs dfs -copyFromLocal pg4300.txt input
-{ time hadoop jar /usr/local/hadoop-3.3.4/share/hadoop/mapreduce/hadoop-mapreduce-examples-3.3.4.jar wordcount ~/pg4300.txt output 2> hadoop.stderr  ; } 2> time_hadoop.txt
+{ time hadoop jar /usr/local/hadoop-3.3.4/share/hadoop/mapreduce/hadoop-mapreduce-examples-3.3.4.jar wordcount ~/input/pg4300.txt output 2> hadoop.stderr  ; } 2> time_hadoop.txt
 """

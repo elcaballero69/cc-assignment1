@@ -9,6 +9,9 @@ import requests
 from multiprocessing import Pool
 from datetime import date
 from datetime import datetime, timedelta
+
+import botocore
+import paramiko
 # import matplotlib.pyplot as plt
 # import matplotlib as mpl
 # import webbrowser
@@ -18,6 +21,7 @@ from datetime import datetime, timedelta
 userdata="""#!/bin/bash
 cd /home/ubuntu
 sudo apt-get update
+yes | sudo apt  install awscli
 yes | sudo apt install openjdk-11-jdk-headless
 sudo apt-get install wget
 wget https://dlcdn.apache.org/hadoop/common/stable/hadoop-3.3.4.tar.gz
@@ -40,9 +44,8 @@ wget -d --user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.
 cp pg4300.txt.utf8.gzip pg4300.txt.gz
 gunzip -kv pg4300.txt.gz
 { time cat pg4300.txt | tr ' ' '\n' | sort | uniq -c  ; } 2> time_linux.txt
-hdfs dfs -mkdir input
-hdfs dfs -copyFromLocal pg4300.txt input
-{ time hadoop jar /usr/local/hadoop-3.3.4/share/hadoop/mapreduce/hadoop-mapreduce-examples-3.3.4.jar wordcount ~/pg4300.txt output 2> hadoop.stderr  ; } 2> time_hadoop.txt
+mkdir input
+mv pg4300.txt input
 """
 
 def createSecurityGroup(ec2_client):
@@ -130,11 +133,31 @@ def createInstances(ec2_client, ec2, SECURITY_GROUP, availabilityZones):
 
     instance_ids.append(instances_m4_a[0].id)
 
+    instances_m4_a[0].wait_until_running()
+    instances_m4_a[0].reload()
+
+    ip = instances_m4_a[0].public_ip_address
+    print(ip)
+
     # Wait for all instances to be active!
     instance_running_waiter = ec2_client.get_waiter('instance_running')
     instance_running_waiter.wait(InstanceIds=(instance_ids))
 
-    return instance_ids
+    return [instance_ids, ip]
+
+
+def compareCode(ip):
+
+    accesKey = paramiko.RSAKey.from_private_key_file("labsuser.pem")
+    client = paramiko.SSHClient()
+    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    try:
+        client.connect(hostname=ip, username="ubuntu", pkey=accesKey)
+        stdin, stdout, stderr = client.exec_command('source ~/.profile \n { time hadoop jar /usr/local/hadoop-3.3.4/share/hadoop/mapreduce/hadoop-mapreduce-examples-3.3.4.jar wordcount ~/input/pg4300.txt output 2> hadoop.stderr  ; } 2> time_hadoop.txt')
+        print(stderr.read())
+        client.close()
+    except:
+        print("error occured")
 
 
 
@@ -157,11 +180,15 @@ def main():
     print("Zone 1a: ", availabilityZones.get('us-east-1a'), "\n")
 
     """-------------------Create the instances--------------------------"""
-    ins_ids = createInstances(ec2_client, ec2, SECURITY_GROUP, availabilityZones)
-    print("Instance ids: \n", str(ins_ids), "\n")
+    ins = createInstances(ec2_client, ec2, SECURITY_GROUP, availabilityZones)
+    print("Instance ids: \n", str(ins[0]), "\n")
+    print("Instance ip: \n", str(ins[1]), "\n")
 
     """-------------------Run Wordcount experiment--------------------------"""
-
+    print("Wait installation")
+    time.sleep(300)
+    compareCode(ins[1])
+    print("Check the instance: \n", str(ins[1]), "\n")
     """-------------------Get output--------------------------"""
 
     """-------------------plot and compare--------------------------"""
@@ -169,7 +196,5 @@ def main():
     """-------------------Write MapReduce program--------------------------"""
 
     """-------------------Run Recomendation System--------------------------"""
-
-
 
 main()
