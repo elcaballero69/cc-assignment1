@@ -18,10 +18,9 @@ import paramiko
 
 # This makes the plots made by the script open in a webbrowser
 # mpl.use('WebAgg')
-userdata="""#!/bin/bash
+userdata_hadoop="""#!/bin/bash
 cd /home/ubuntu
 sudo apt-get update
-yes | sudo apt  install awscli
 yes | sudo apt install openjdk-11-jdk-headless
 sudo apt-get install wget
 wget https://dlcdn.apache.org/hadoop/common/stable/hadoop-3.3.4.tar.gz
@@ -46,6 +45,58 @@ gunzip -kv pg4300.txt.gz
 { time cat pg4300.txt | tr ' ' '\n' | sort | uniq -c  ; } 2> time_linux.txt
 mkdir input
 mv pg4300.txt input
+"""
+
+userdata_spark="""#!/bin/bash
+sudo apt-get update
+yes | sudo apt install default-jdk scala git -y
+sudo apt-get install wget
+sudo wget https://archive.apache.org/dist/spark/spark-3.0.1/spark-3.0.1-bin-hadoop2.7.tgz
+sudo tar xvf spark-*
+sudo mv spark-3.0.1-bin-hadoop2.7 /opt/spark
+sudo cat << EOF >> .profile
+export SPARK_HOME=/opt/spark
+export PATH=\$PATH:\$SPARK_HOME/bin:\$SPARK_HOME/sbin
+export PYSPARK_PYTHON=/usr/bin/python3
+EOF
+source ~/.profile
+sudo apt install python3-pip
+y | pip install urllib3
+pip install pandas
+pip install flask
+pip install xlsxwriter
+pyspark
+import urllib3
+import pandas as pd
+import time
+http = urllib3.PoolManager()
+LINKS = ['http://www.gutenberg.ca/ebooks/buchanj-midwinter/buchanj-midwinter-00-t.txt',
+         'http://www.gutenberg.ca/ebooks/carman-farhorizons/carman-farhorizons-00-t.txt',
+         'http://www.gutenberg.ca/ebooks/colby-champlain/colby-champlain-00-t.txt',
+         'http://www.gutenberg.ca/ebooks/cheyneyp-darkbahama/cheyneyp-darkbahama-00-t.txt',
+         'http://www.gutenberg.ca/ebooks/delamare-bumps/delamare-bumps-00-t.txt',
+         'http://www.gutenberg.ca/ebooks/charlesworth-scene/charlesworth-scene-00-t.txt',
+         'http://www.gutenberg.ca/ebooks/delamare-lucy/delamare-lucy-00-t.txt',
+         'http://www.gutenberg.ca/ebooks/delamare-myfanwy/delamare-myfanwy-00-t.txt',
+         'http://www.gutenberg.ca/ebooks/delamare-penny/delamare-penny-00-t.txt'
+         ]
+result = pd.DataFrame()
+start = time.time()
+for i in range(0,3):
+    for link in LINKS:
+        r = http.request('GET', link)
+        content = r.data.decode('latin-1')
+        content = content.replace('\n',' ')
+        rdd = sc.parallelize(content.split(' '))
+        rdd = rdd.map(lambda x: (x,1))
+        rdd = rdd.reduceByKey(lambda x,y: x + y).sortByKey()
+        df = rdd.toDF(['Word', f'Count_Link{str(LINKS.index(link))}']).toPandas().sort_values(f'Count_Link{str(LINKS.index(link))}', axis=0, ascending = False).set_index('Word')
+        if i == 0:
+            result = pd.concat([result, df], axis=1)
+            df.to_excel('~/wordcount_file.xlsx', engine = 'xlsxwriter')
+end = time.time()
+with open("elapsed_time.txt", "w") as f:
+    f.write(str(end-start))
 """
 
 def createSecurityGroup(ec2_client):
@@ -103,7 +154,7 @@ def getAvailabilityZones(ec2_client):
     return availabilityzones
 
 
-def createInstance(ec2, INSTANCE_TYPE, COUNT, SECURITY_GROUP, SUBNET_ID):
+def createInstance(ec2, INSTANCE_TYPE, COUNT, SECURITY_GROUP, SUBNET_ID, userdata):
     # Don't change these
     KEY_NAME = "vockey"
     INSTANCE_IMAGE = "ami-08d4ac5b634553e16"
@@ -119,7 +170,7 @@ def createInstance(ec2, INSTANCE_TYPE, COUNT, SECURITY_GROUP, SUBNET_ID):
         UserData=userdata
     )
 
-def createInstances(ec2_client, ec2, SECURITY_GROUP, availabilityZones):
+def createInstances(ec2_client, ec2, SECURITY_GROUP, availabilityZones, userdata):
     # Get wanted availability zone
     availability_zone_1a = availabilityZones.get('us-east-1a')
 
@@ -127,7 +178,7 @@ def createInstances(ec2_client, ec2, SECURITY_GROUP, availabilityZones):
     # instances_m4_a = createInstance(ec2, "m4.nano", 1, SECURITY_GROUP, availability_zone_1a)
 
     # Use m4.large for deployment/demo
-    instances_m4_a = createInstance(ec2, "m4.large", 1, SECURITY_GROUP, availability_zone_1a)
+    instances_m4_a = createInstance(ec2, "m4.large", 1, SECURITY_GROUP, availability_zone_1a, userdata)
 
     instance_ids = []
 
@@ -180,15 +231,18 @@ def main():
     print("Zone 1a: ", availabilityZones.get('us-east-1a'), "\n")
 
     """-------------------Create the instances--------------------------"""
-    ins = createInstances(ec2_client, ec2, SECURITY_GROUP, availabilityZones)
-    print("Instance ids: \n", str(ins[0]), "\n")
-    print("Instance ip: \n", str(ins[1]), "\n")
+    ins_hadoop = createInstances(ec2_client, ec2, SECURITY_GROUP, availabilityZones, userdata_hadoop)
+    print("Instance ids: \n", str(ins_hadoop[0]), "\n")
+    print("Instance ip: \n", str(ins_hadoop[1]), "\n")
+    ins_spark = createInstances(ec2_client, ec2, SECURITY_GROUP, availabilityZones, userdata_spark)
+    print("Instance ids: \n", str(ins_spark[0]), "\n")
+    print("Instance ip: \n", str(ins_spark[1]), "\n")
 
     """-------------------Run Wordcount experiment--------------------------"""
     print("Wait installation")
     time.sleep(300)
-    compareCode(ins[1])
-    print("Check the instance: \n", str(ins[1]), "\n")
+    compareCode(ins_hadoop[1])
+    print("Check the instance: \n", str(ins_hadoop[1]), "\n")
     """-------------------Get output--------------------------"""
 
     """-------------------plot and compare--------------------------"""
