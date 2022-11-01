@@ -52,6 +52,7 @@ LINKS = ['http://www.gutenberg.ca/ebooks/buchanj-midwinter/buchanj-midwinter-00-
          ]
 
 result = pd.DataFrame()
+<<<<<<< HEAD
  
 for i in range(0,3): 
     for link in LINKS:
@@ -89,3 +90,16 @@ EOF
 
 for i in range(0,3):
     if i == 0:
+=======
+
+for link in LINKS:
+    r = http.request('GET', link)
+    content = r.data.decode('latin-1')
+    content = content.replace('\n',' ')
+    rdd = sc.parallelize(content.split(' '))
+    rdd = rdd.map(lambda x: (x,1))
+    rdd = rdd.reduceByKey(lambda x,y: x + y).sortByKey()
+    df = rdd.toDF(['Word', f'Count_Link{str(LINKS.index(link))}']).toPandas().sort_values(f'Count_Link{str(LINKS.index(link))}', axis=0, ascending = False).set_index('Word')
+    result = pd.concat([result, df], axis=1)
+'''
+>>>>>>> efd46ddc93d2621434d95ab2f9b77fa4fc34a059
