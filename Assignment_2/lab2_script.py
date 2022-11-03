@@ -17,6 +17,12 @@ import os
 # import matplotlib as mpl
 # import webbrowser
 
+# allows us to geth the path for the pem file
+from pathlib import Path
+
+def get_project_root() -> Path:
+    return Path(__file__).parent
+
 # This makes the plots made by the script open in a webbrowser
 # mpl.use('WebAgg')
 
@@ -197,6 +203,37 @@ def createInstances(ec2_client, ec2, SECURITY_GROUP, availabilityZones, userdata
 
     return [instance_ids, ip]
 
+
+def waiter(ec2_client, ins_hadoop, ins_spark):
+    ready = False
+    accesKey = paramiko.RSAKey.from_private_key_file(
+        "C:/Users/meste/PycharmProjects/CloudComputing/cc-assignment1/Assignment_2/labsuser.pem")
+    client = paramiko.SSHClient()
+    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    while (ready == False):
+        try:
+            client.connect(hostname=ins_hadoop[1], username="ubuntu", pkey=accesKey)
+            # client.connect(hostname=ins_spark[1], username="ubuntu", pkey=accesKey)
+            print("testing connection")
+        except:
+            time.sleep(10)
+        else:
+            client.close()
+            print("instances up and running")
+            ready = True
+
+    return True
+
+
+def getParamikoClient():
+    path = str(get_project_root()).replace('\\', '/')
+    print("path", path)
+    accesKey = paramiko.RSAKey.from_private_key_file(path + "/labsuser.pem")
+    client = paramiko.SSHClient()
+    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
+    return client, accesKey
+
 def send_command(client, command):
     try:
         stdin, stdout, stderr = client.exec_command(command)
@@ -218,10 +255,8 @@ def get_execution_time(client, command):
         print("error occured in getting execution time")
 
 
-def compare_Hadoop_vs_Linux_worcount(ip):
-    accesKey = paramiko.RSAKey.from_private_key_file("C:/Users/meste/PycharmProjects/CloudComputing/cc-assignment1/Assignment_2/labsuser.pem")
-    client = paramiko.SSHClient()
-    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+def compare_Hadoop_vs_Linux_worcount(ip, client, accesKey):
+
     try:
         client.connect(hostname=ip, username="ubuntu", pkey=accesKey)
     except:
@@ -242,25 +277,6 @@ def compare_Hadoop_vs_Linux_worcount(ip):
 
     client.close()
 
-def waiter(ec2_client, ins_hadoop, ins_spark):
-
-    ready = False
-    accesKey = paramiko.RSAKey.from_private_key_file("C:/Users/meste/PycharmProjects/CloudComputing/cc-assignment1/Assignment_2/labsuser.pem")
-    client = paramiko.SSHClient()
-    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    while (ready == False):
-        try:
-            client.connect(hostname=ins_hadoop[1], username="ubuntu", pkey=accesKey)
-            #client.connect(hostname=ins_spark[1], username="ubuntu", pkey=accesKey)
-            print("testing connection")
-        except:
-            time.sleep(10)
-        else:
-            client.close()
-            print("instances up and running")
-            ready = True
-
-    return True
 
 def main():
     """------------Get necesarry clients from boto3------------------------"""
@@ -269,6 +285,8 @@ def main():
     elbv2 = boto3.client('elbv2')
     cw = boto3.client('cloudwatch')
     iam = boto3.client('iam')
+    """------------Create Paramiko Client------------------------------"""
+    paramiko_client, accesKey = getParamikoClient()
 
     """-------------------Create security group--------------------------"""
     SECURITY_GROUP, vpc_id = createSecurityGroup(ec2_client)
@@ -296,7 +314,7 @@ def main():
     end_time = time.time()
     print("Waiting time:", end_time-start_time)"""
     print("Comparing Hadoop vs linux in wordcount")
-    compare_Hadoop_vs_Linux_worcount(ins_hadoop[1])
+    compare_Hadoop_vs_Linux_worcount(ins_hadoop[1], paramiko_client, accesKey)
     print("Check the instance: \n", str(ins_hadoop[1]), "\n")
     """-------------------Get output--------------------------"""
 

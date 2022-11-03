@@ -3,6 +3,11 @@
 import paramiko
 import binascii
 import time
+import os
+from pathlib import Path
+
+def get_project_root() -> Path:
+    return Path(__file__).parent
 
 def waiter(ec2_client, ins_hadoop, ins_spark):
     instance_ids = [ins_hadoop[0], ins_spark[0]]
@@ -53,7 +58,11 @@ def compareCode(ip):
 
 def main():
     ins_hadoop=[['i-0f91b5b69c7d7c668'], '3.228.16.17']
-    hadoopoutput = compareCode(ins_hadoop[1])
+    path = str(get_project_root()).replace('\\', '/')
+    print("path", path)
+    #newPath = path.replace('\\', '/')
+    print(path + "/labsuser.pem")
+    #hadoopoutput = compareCode(ins_hadoop[1])
     print("Check the instance: \n", str(ins_hadoop[1]), "\n")
 
 
