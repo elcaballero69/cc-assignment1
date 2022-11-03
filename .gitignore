@@ -1,4 +1,5 @@
 
 .DS_Store
 *.pem
+*.ppk
 Assignment_1/Extra_files/labsuser.pem

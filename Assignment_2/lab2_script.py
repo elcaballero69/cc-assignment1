@@ -12,12 +12,15 @@ from datetime import datetime, timedelta
 
 import botocore
 import paramiko
+import os
 # import matplotlib.pyplot as plt
 # import matplotlib as mpl
 # import webbrowser
 
 # This makes the plots made by the script open in a webbrowser
 # mpl.use('WebAgg')
+
+
 userdata_hadoop="""#!/bin/bash
 cd /home/ubuntu
 sudo apt-get update
@@ -38,11 +41,9 @@ cat << EOF >> /usr/local/hadoop-3.3.4/etc/hadoop/hadoop-env.sh
 # export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
 # export HADOOP_PREFIX=/usr/local/hadoop-3.3.4
 EOF
-source ~/.profile
 wget -d --user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36" https://www.gutenberg.org/cache/epub/4300/pg4300.txt.utf8.gzip
 cp pg4300.txt.utf8.gzip pg4300.txt.gz
 gunzip -kv pg4300.txt.gz
-{ time cat pg4300.txt | tr ' ' '\n' | sort | uniq -c  ; } 2> time_linux.txt
 mkdir input
 mv pg4300.txt input
 """
@@ -196,21 +197,72 @@ def createInstances(ec2_client, ec2, SECURITY_GROUP, availabilityZones, userdata
 
     return [instance_ids, ip]
 
+def send_command(client, command):
+    try:
+        stdin, stdout, stderr = client.exec_command(command)
+        print("stderr.read():", stderr.read())
+        #output = stdout.read().decode('ascii').split("\n")
+        print("stdout", stdout.read())
+    except:
+        print("error occured in sending command")
 
-def compareCode(ip):
+def get_execution_time(client, command):
+    try:
+        stdin, stdout, stderr = client.exec_command(command)
+        print("stderr.read():", stderr.read())
+        output = stdout.read().decode('ascii').split("\n")
+        print("stdout", output)
+        time_real = output[1].split("\t")
+        return time_real[1]
+    except:
+        print("error occured in getting execution time")
 
-    accesKey = paramiko.RSAKey.from_private_key_file("labsuser.pem")
+
+def compare_Hadoop_vs_Linux_worcount(ip):
+    accesKey = paramiko.RSAKey.from_private_key_file("C:/Users/meste/PycharmProjects/CloudComputing/cc-assignment1/Assignment_2/labsuser.pem")
     client = paramiko.SSHClient()
     client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     try:
         client.connect(hostname=ip, username="ubuntu", pkey=accesKey)
-        stdin, stdout, stderr = client.exec_command('source ~/.profile \n { time hadoop jar /usr/local/hadoop-3.3.4/share/hadoop/mapreduce/hadoop-mapreduce-examples-3.3.4.jar wordcount ~/input/pg4300.txt output 2> hadoop.stderr  ; } 2> time_hadoop.txt')
-        print(stderr.read())
-        client.close()
     except:
-        print("error occured")
+        print("could not connect to client")
 
+    # performing the map reduce tasks
+    print("Execution time for linux and hadoop")
+    res_linux = send_command(client, "{ time cat input/pg4300.txt | tr ' ' '\n' | sort | uniq -c  ; } 2> time_linux.txt")
+    res_hadoop = send_command(client, 'source ~/.profile \n { time hadoop jar /usr/local/hadoop-3.3.4/share/hadoop/mapreduce/hadoop-mapreduce-examples-3.3.4.jar wordcount ~/input/pg4300.txt output 2> hadoop.stderr  ; } 2> time_hadoop.txt')
 
+    # retrieving the execution time
+    print("retrieving the execution time for linux and hadoop")
+    linux_time = get_execution_time(client, 'cat time_linux.txt')
+    hadoop_time = get_execution_time(client, 'cat time_hadoop.txt')
+
+    print("\nExecution time for Hadoop is:", hadoop_time)
+    print("Execution time for Linux is:", linux_time, '\n')
+
+    client.close()
+
+def waiter(ec2_client, ins_hadoop, ins_spark):
+    instance_ids = [ins_hadoop[0], ins_spark[0]]
+    instance_running_waiter = ec2_client.get_waiter('instance_running')
+    instance_running_waiter.wait(InstanceIds=(instance_ids))
+
+    ready = False
+    accesKey = paramiko.RSAKey.from_private_key_file("C:/Users/meste/PycharmProjects/CloudComputing/cc-assignment1/Assignment_2/labsuser.pem")
+    client = paramiko.SSHClient()
+    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    while (ready == False):
+        try:
+            client.connect(hostname=ins_hadoop[1], username="ubuntu", pkey=accesKey)
+            #client.connect(hostname=ins_spark[1], username="ubuntu", pkey=accesKey)
+        except:
+            time.sleep(10)
+        else:
+            client.close()
+            print("instances up and running")
+            ready = True
+
+    return True
 
 def main():
     """------------Get necesarry clients from boto3------------------------"""
@@ -241,7 +293,9 @@ def main():
     """-------------------Run Wordcount experiment--------------------------"""
     print("Wait installation")
     time.sleep(300)
-    compareCode(ins_hadoop[1])
+    #running = waiter(ec2_client, ins_hadoop, ins_spark)
+    print("Comparing Hadoop vs linux in wordcount")
+    compare_Hadoop_vs_Linux_worcount(ins_hadoop[1])
     print("Check the instance: \n", str(ins_hadoop[1]), "\n")
     """-------------------Get output--------------------------"""
 
