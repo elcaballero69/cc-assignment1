@@ -243,9 +243,6 @@ def compare_Hadoop_vs_Linux_worcount(ip):
     client.close()
 
 def waiter(ec2_client, ins_hadoop, ins_spark):
-    instance_ids = [ins_hadoop[0], ins_spark[0]]
-    instance_running_waiter = ec2_client.get_waiter('instance_running')
-    instance_running_waiter.wait(InstanceIds=(instance_ids))
 
     ready = False
     accesKey = paramiko.RSAKey.from_private_key_file("C:/Users/meste/PycharmProjects/CloudComputing/cc-assignment1/Assignment_2/labsuser.pem")
@@ -255,6 +252,7 @@ def waiter(ec2_client, ins_hadoop, ins_spark):
         try:
             client.connect(hostname=ins_hadoop[1], username="ubuntu", pkey=accesKey)
             #client.connect(hostname=ins_spark[1], username="ubuntu", pkey=accesKey)
+            print("testing connection")
         except:
             time.sleep(10)
         else:
@@ -293,7 +291,10 @@ def main():
     """-------------------Run Wordcount experiment--------------------------"""
     print("Wait installation")
     time.sleep(300)
-    #running = waiter(ec2_client, ins_hadoop, ins_spark)
+    """start_time = time.time()
+    running = waiter(ec2_client, ins_hadoop, ins_spark)
+    end_time = time.time()
+    print("Waiting time:", end_time-start_time)"""
     print("Comparing Hadoop vs linux in wordcount")
     compare_Hadoop_vs_Linux_worcount(ins_hadoop[1])
     print("Check the instance: \n", str(ins_hadoop[1]), "\n")
