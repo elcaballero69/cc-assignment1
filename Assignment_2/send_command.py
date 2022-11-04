@@ -38,18 +38,19 @@ def compareCode(ip):
     except:
         print("could not connect to client")
     try:
-        stdin1, stdout1, stderr1 = client.exec_command('cat time_linux.txt')
+        """stdin1, stdout1, stderr1 = client.exec_command('cat time_linux.txt')
         print("stderr.read():", stderr1.read())
         time_b = stdout1.read().decode('ascii').split("\n")
         print("stdout.read()", time_b[1])
         time_real = time_b[1].split("\t")
-        print("real:", time_real[1])
+        print("real:", time_real[1])"""
 
-        """stdin2, stdout2, stderr2 = client.exec_command("mv pg4300.txt input")
-        print("stderr.read():", stderr2.read())"""
-        """stdin, stdout, stderr = client.exec_command('source ~/.profile \n time hadoop jar /usr/local/hadoop-3.3.4/share/hadoop/mapreduce/hadoop-mapreduce-examples-3.3.4.jar wordcount ~/input/pg4300.txt output')
+        x = 1
+        print('{ time hadoop jar /usr/local/hadoop-3.3.4/share/hadoop/mapreduce/hadoop-mapreduce-examples-3.3.4.jar wordcount ~/wordcountinput output' + str(x) + ' 2> hadoop' + str(x) + '.stderr  ; } 2> time_hadoop' + str(x) + '.txt')
+        stdin, stdout, stderr = client.exec_command('source ~/.profile \n '
+                            '{ time hadoop jar /usr/local/hadoop-3.3.4/share/hadoop/mapreduce/hadoop-mapreduce-examples-3.3.4.jar wordcount ~/wordcountinput wordcountoutput' + str(x) + ' 2> hadoop' + str(x) + '.stderr  ; } 2> time_hadoop' + str(x) + '.txt')
         print("stderr.read():", stderr.read())
-        print("stdout", stdout.read())"""
+        print("stdout", stdout.read())
         client.close()
     except:
         print("error occured")
@@ -57,12 +58,12 @@ def compareCode(ip):
 
 
 def main():
-    ins_hadoop=[['i-0f91b5b69c7d7c668'], '3.228.16.17']
+    ins_hadoop=[['i-0f91b5b69c7d7c668'], '44.201.13.240']
     path = str(get_project_root()).replace('\\', '/')
     print("path", path)
     #newPath = path.replace('\\', '/')
     print(path + "/labsuser.pem")
-    #hadoopoutput = compareCode(ins_hadoop[1])
+    hadoopoutput = compareCode(ins_hadoop[1])
     print("Check the instance: \n", str(ins_hadoop[1]), "\n")
 
 

@@ -265,7 +265,8 @@ def compare_Hadoop_vs_Linux_worcount(ip, client, accesKey):
     # performing the map reduce tasks
     print("Execution time for linux and hadoop")
     res_linux = send_command(client, "{ time cat input/pg4300.txt | tr ' ' '\n' | sort | uniq -c  ; } 2> time_linux.txt")
-    res_hadoop = send_command(client, 'source ~/.profile \n { time hadoop jar /usr/local/hadoop-3.3.4/share/hadoop/mapreduce/hadoop-mapreduce-examples-3.3.4.jar wordcount ~/input/pg4300.txt output 2> hadoop.stderr  ; } 2> time_hadoop.txt')
+    res_hadoop = send_command(client, 'source ~/.profile \n '
+                                      '{ time hadoop jar /usr/local/hadoop-3.3.4/share/hadoop/mapreduce/hadoop-mapreduce-examples-3.3.4.jar wordcount ~/input/pg4300.txt output 2> hadoop.stderr  ; } 2> time_hadoop.txt')
 
     # retrieving the execution time
     print("retrieving the execution time for linux and hadoop")
@@ -285,19 +286,34 @@ def addNewInputfiles(client, accesKey, ip_hadoop):
     except:
         print("could not connect to client")
 
-    # performing the map reduce tasks
+    # setting up new input files for hadoop, for the second benchmarking scenario
     print("Setting up new input files for hadoop")
-    res = send_command(client, "cd input \n "
-                               "sudo rm pg4300.txt \n"
+    res = send_command(client, "mkdir wordcountinput \n "
+                               "cd wordcountinput \n"
                                "sudo wget https://tinyurl.com/4vxdw3pa \n"
                                "sudo wget https://tinyurl.com/kh9excea \n"
-                               "sudo https://tinyurl.com/dybs9bnk \n"
-                               "sudo https://tinyurl.com/datumz6m \n"
-                               "sudo https://tinyurl.com/j4j4xdw6 \n"
-                               "sudo https://tinyurl.com/ym8s5fm4 \n"
-                               "sudo https://tinyurl.com/2h6a75nk \n"
-                               "sudo https://tinyurl.com/vwvram8 \n"
-                               "sudo https://tinyurl.com/weh83uyn")
+                               "sudo wget https://tinyurl.com/dybs9bnk \n"
+                               "sudo wget https://tinyurl.com/datumz6m \n"
+                               "sudo wget https://tinyurl.com/j4j4xdw6 \n"
+                               "sudo wget https://tinyurl.com/ym8s5fm4 \n"
+                               "sudo wget https://tinyurl.com/2h6a75nk \n"
+                               "sudo wget https://tinyurl.com/vwvram8 \n"
+                               "sudo wget https://tinyurl.com/weh83uyn \n"
+                               "cd ../")
+
+    client.close()
+
+def runWordcountHadoop(client, accesKey, ip_hadoop):
+    try:
+        client.connect(hostname=ip_hadoop, username="ubuntu", pkey=accesKey)
+    except:
+        print("could not connect to client")
+
+    # setting up new input files for hadoop, for the second benchmarking scenario
+    print("Running wordcount on hadoop for three iterations")
+    for x in range(1, 4):
+        res = send_command(client, 'source ~/.profile \n '
+                            '{ time hadoop jar /usr/local/hadoop-3.3.4/share/hadoop/mapreduce/hadoop-mapreduce-examples-3.3.4.jar wordcount ~/wordcountinput output' + str(x) + ' 2> hadoop' + str(x) + '.stderr  ; } 2> time_hadoop' + str(x) + '.txt')
 
     client.close()
 
@@ -338,7 +354,7 @@ def main():
 
     """-------------------Run Wordcount experiment hadoop vs spark--------------------------"""
     addNewInputfiles(paramiko_client, accesKey, ins_hadoop[1])
-
+    runWordcountHadoop(paramiko_client, accesKey, ins_hadoop[1])
     """-------------------Get output--------------------------"""
 
     """-------------------plot and compare--------------------------"""
