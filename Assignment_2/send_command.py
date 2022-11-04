@@ -5,6 +5,8 @@ import binascii
 import time
 import os
 from pathlib import Path
+from datetime import datetime
+import matplotlib.pyplot as plt
 
 def get_project_root() -> Path:
     return Path(__file__).parent
@@ -63,8 +65,25 @@ def main():
     print("path", path)
     #newPath = path.replace('\\', '/')
     print(path + "/labsuser.pem")
-    hadoopoutput = compareCode(ins_hadoop[1])
+    #hadoopoutput = compareCode(ins_hadoop[1])
     print("Check the instance: \n", str(ins_hadoop[1]), "\n")
 
+    time_str = ['0m6.953s', '0m5.859s', '0m5.973s']
+    hadoop_wordcount_time = []
+    for x in time_str:
+        time1= x.replace('m', ':').replace('s', '').replace('.', ':')
+        #time2=time1.replace('s', '')
+        #time3 = time2.replace('.', ':')
+        print(time1)
+        time = datetime.strptime(time1, '%M:%S:%f')
+        print(time)
+        hadoop_wordcount_time.append(time)
+
+    x = [1,2,3]
+    plt.plot(x, hadoop_wordcount_time, 'bo--')
+    plt.title("Hadoop Wordcount Execution Time")
+    plt.ylabel("Execution Time")
+    plt.xlabel("Iteration")
+    plt.show()
 
 main()

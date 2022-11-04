@@ -12,9 +12,8 @@ from datetime import datetime, timedelta
 
 import botocore
 import paramiko
-import os
-# import matplotlib.pyplot as plt
-# import matplotlib as mpl
+import matplotlib.pyplot as plt
+import matplotlib as mpl
 # import webbrowser
 
 # allows us to geth the path for the pem file
@@ -250,6 +249,7 @@ def get_execution_time(client, command):
         output = stdout.read().decode('ascii').split("\n")
         print("stdout", output)
         time_real = output[1].split("\t")
+
         return time_real[1]
     except:
         print("error occured in getting execution time")
@@ -317,6 +317,36 @@ def runWordcountHadoop(client, accesKey, ip_hadoop):
 
     client.close()
 
+def getHadoopWordcountRunTime(client, accesKey, ip_hadoop):
+    try:
+        client.connect(hostname=ip_hadoop, username="ubuntu", pkey=accesKey)
+    except:
+        print("could not connect to client")
+
+    # setting up new input files for hadoop, for the second benchmarking scenario
+    print("Running wordcount on hadoop for three iterations")
+    hadoop_wordcount_time = []
+    for x in range(1, 4):
+        hadoop_wordcount_time.append(get_execution_time(client, 'cat time_hadoop' + str(x) + '.txt'))
+
+    client.close()
+    print(hadoop_wordcount_time)
+    return hadoop_wordcount_time
+
+def changeStrToTime(hadoop_wordcount_time_str):
+    hadoop_wordcount_time = []
+    for x in hadoop_wordcount_time_str:
+        time = x.replace('m', ':').replace('s', '').replace('.', ':')
+        hadoop_wordcount_time.append(datetime.strptime(time, '%M:%S:%f'))
+    return hadoop_wordcount_time
+
+def plot_time(hadoop_wordcount_time, title):
+    plt.plot(hadoop_wordcount_time, 'bo--')
+    plt.title(title)
+    plt.ylabel("Execution Time")
+    plt.xlabel("Iteration")
+    plt.show()
+
 def main():
     """------------Get necesarry clients from boto3------------------------"""
     ec2_client = boto3.client("ec2")
@@ -356,9 +386,10 @@ def main():
     addNewInputfiles(paramiko_client, accesKey, ins_hadoop[1])
     runWordcountHadoop(paramiko_client, accesKey, ins_hadoop[1])
     """-------------------Get output--------------------------"""
-
+    hadoop_wordcount_time_str = getHadoopWordcountRunTime(paramiko_client, accesKey, ins_hadoop[1])
     """-------------------plot and compare--------------------------"""
-
+    hadoop_wordcount_time = changeStrToTime(hadoop_wordcount_time_str)
+    plot_time(hadoop_wordcount_time, "Hadoop Wordcount Execution Time")
     """-------------------Write MapReduce program--------------------------"""
 
     """-------------------Run Recomendation System--------------------------"""
