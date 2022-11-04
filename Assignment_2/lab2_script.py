@@ -278,6 +278,29 @@ def compare_Hadoop_vs_Linux_worcount(ip, client, accesKey):
     client.close()
 
 
+def addNewInputfiles(client, accesKey, ip_hadoop):
+
+    try:
+        client.connect(hostname=ip_hadoop, username="ubuntu", pkey=accesKey)
+    except:
+        print("could not connect to client")
+
+    # performing the map reduce tasks
+    print("Setting up new input files for hadoop")
+    res = send_command(client, "cd input \n "
+                               "sudo rm pg4300.txt \n"
+                               "sudo wget https://tinyurl.com/4vxdw3pa \n"
+                               "sudo wget https://tinyurl.com/kh9excea \n"
+                               "sudo https://tinyurl.com/dybs9bnk \n"
+                               "sudo https://tinyurl.com/datumz6m \n"
+                               "sudo https://tinyurl.com/j4j4xdw6 \n"
+                               "sudo https://tinyurl.com/ym8s5fm4 \n"
+                               "sudo https://tinyurl.com/2h6a75nk \n"
+                               "sudo https://tinyurl.com/vwvram8 \n"
+                               "sudo https://tinyurl.com/weh83uyn")
+
+    client.close()
+
 def main():
     """------------Get necesarry clients from boto3------------------------"""
     ec2_client = boto3.client("ec2")
@@ -306,16 +329,16 @@ def main():
     print("Instance ids: \n", str(ins_spark[0]), "\n")
     print("Instance ip: \n", str(ins_spark[1]), "\n")
 
-    """-------------------Run Wordcount experiment--------------------------"""
+    """-------------------Run Wordcount experiment hadoop vs linux--------------------------"""
     print("Wait installation")
     time.sleep(300)
-    """start_time = time.time()
-    running = waiter(ec2_client, ins_hadoop, ins_spark)
-    end_time = time.time()
-    print("Waiting time:", end_time-start_time)"""
     print("Comparing Hadoop vs linux in wordcount")
     compare_Hadoop_vs_Linux_worcount(ins_hadoop[1], paramiko_client, accesKey)
     print("Check the instance: \n", str(ins_hadoop[1]), "\n")
+
+    """-------------------Run Wordcount experiment hadoop vs spark--------------------------"""
+    addNewInputfiles(paramiko_client, accesKey, ins_hadoop[1])
+
     """-------------------Get output--------------------------"""
 
     """-------------------plot and compare--------------------------"""
