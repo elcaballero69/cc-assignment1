@@ -16,17 +16,27 @@ LINKS = ['http://www.gutenberg.ca/ebooks/buchanj-midwinter/buchanj-midwinter-00-
          'http://www.gutenberg.ca/ebooks/delamare-penny/delamare-penny-00-t.txt'
          ]
 
-start = time.time()
+data_files= []
+for link in LINKS:
+    r = http.request('GET', link)
+    content = r.data.decode('latin-1')  # decode the text from bin to string
+    content = content.replace('\n', ' ')  # replace all paragraphs
+    data_files.append(content)
+
+executionTime = []
+
 for i in range(0,3):
-    for link in LINKS:
-        r = http.request('GET', link)
-        content = r.data.decode('latin-1') # decode the text from bin to string
-        content = content.replace('\n',' ') # replace all paragraphs
+    start = time.time()
+    for content in data_files:
         rdd = sc.parallelize(content.split(' ')) # form RDD
         rdd = rdd.map(lambda x: (x,1))  # map each word to a key
         rdd = rdd.reduceByKey(lambda x,y: x + y).sortByKey() #  merge the values of each key
-        df = rdd.toDF(['Word', f'Count_Link{str(LINKS.index(link))}']).toPandas().sort_values(f'Count_Link{str(LINKS.index(link))}', axis=0, ascending = False).set_index('Word')
-        print(df)
+        """df = rdd.toDF(['Word', f'Count_Link{str(data_files.index(content))}']).toPandas().sort_values(f'Count_Link{str(data_files.index(content))}', axis=0, ascending = False).set_index('Word')
+        print(df)"""
 
-end = time.time()
-print('WORDCOUNT TAKES ' + str(end-start) + 'S FOR SPARK')
+    end = time.time()
+    time = end - start
+    executionTime.append(time)
+
+for time in executionTime:
+    print('WORDCOUNT TAKES ' + str(time) + 'S FOR SPARK')
