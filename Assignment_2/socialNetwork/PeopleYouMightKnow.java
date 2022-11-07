@@ -18,12 +18,30 @@ import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 
 
-// People You Might Know Algorithm
-// Class templates based on Hadoop's WordCount.java example
-// NOTE: No IDs allowed larger than 65533, if needed edit to longs
+/**  Proposed people You Might Know Algorithm 
+ * TP2, Advanced cloud computing LOG8415E, fall semester 2022, Polytechnique Montreal
+ * Java document based on Apache Hadoop's WordCount.java
+ * Inspiration for: 
+ * - Intermediate value that represents people already being friends
+ * - A more time efficient way to remove people from the hashmap 
+ * https://www.dbtsai.com/blog/2013/hadoop-mr-to-implement-people-you-might-know-friendship-recommendation/
+ * IMPORTANT: This solution only allows user IDs up to 65533
+ * If larger user IDs are required, change to larger  writeable datatype
+**/
 public class PeopleYouMightKnow {
   public static class PYMKMapper
        extends Mapper<LongWritable, Text, IntWritable, IntWritable>{
+    /**
+     * Maps a series of users and their friendlists onto intermediate values
+     * Writes the intermediate values to context in the form of key value pairs, 
+     * both of type WritableInt
+     * The intermediate values indicate an existing friendship or two people and a mutual friend
+     * 
+     * @param key Input of type LongWritable 
+     * represents from which line in the input file this entry comes
+     * @param value Input of type Text
+     * represents a user and its friendlist like <USER><TAB><FRIENDLIST>
+    **/
     @Override
     public void map(LongWritable key, Text value,
      Context context) throws IOException, InterruptedException {
@@ -64,6 +82,22 @@ public class PeopleYouMightKnow {
   public static class PYMKReducer
        extends Reducer<IntWritable, IntWritable, IntWritable, Text> {
     @Override
+    /**
+     * Reduces a series of intermediate values to a series of users and a list of suggested friends.
+     * Writes intermediate values to context in the form of key value pairs, 
+     * both of type WritableInt
+     * 
+     * @param key Input of type IntWritable
+     * Represents one user
+     * @param value Input of type IntWritable
+     * represents two userIDs, separated using a bitshift
+      * 1. If both value userIDs are valid: 
+      * represents the key userID and the second value userID
+      * have the first value userID as a mutual friend
+      * 2. If only one value userID is valid:
+      * represents the key userID and the second value userID
+      * are already friends
+    **/
     public void reduce(IntWritable key, Iterable<IntWritable> values,
                        Context context
                        ) throws IOException, InterruptedException {
@@ -140,7 +174,14 @@ public class PeopleYouMightKnow {
       
     }
   }
-
+  /**
+   * Define configuration of the MapReduce program.
+   * This indicates to hadoop which child classes represent
+   * the mapper and the reducer respectively.
+   * Also indicates where to write the results of the reducer to
+   * 
+   * @param args passes the arguments to the mapper function
+  **/
   public static void main(String[] args) throws Exception {
     // Create new Job configuration
     Configuration conf = new Configuration();
@@ -148,7 +189,6 @@ public class PeopleYouMightKnow {
     // Set Mapper, Combiner and Reducer classes
     job.setJarByClass(PeopleYouMightKnow.class);
     job.setMapperClass(PYMKMapper.class);
-    // job.setCombinerClass(PYMKReducer.class);
     job.setReducerClass(PYMKReducer.class);
     // Input and Output formats
     job.setInputFormatClass(TextInputFormat.class);
@@ -156,9 +196,6 @@ public class PeopleYouMightKnow {
     // Set output types of the reducer
     job.setOutputKeyClass(IntWritable.class);
     job.setOutputValueClass(IntWritable.class);
-    // Set output types of the mapper
-    // job.setMapOutputKeyClass(IntWritable.class);
-    // job.setMapOutputValueClass(IntWritable.class);
 
     FileSystem newOutFileSystem = new Path(args[1]).getFileSystem(conf);
     newOutFileSystem.delete(new Path(args[1]), true);
