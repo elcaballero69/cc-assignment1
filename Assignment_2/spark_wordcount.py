@@ -1,6 +1,5 @@
 # run this script on the remote machine's pyspark
 import urllib3
-import pandas as p
 import time
 http = urllib3.PoolManager()
 
@@ -23,20 +22,16 @@ for link in LINKS:
     content = content.replace('\n', ' ')  # replace all paragraphs
     data_files.append(content)
 
-executionTime = []
-
+execution_time = []
 for i in range(0,3):
     start = time.time()
     for content in data_files:
         rdd = sc.parallelize(content.split(' ')) # form RDD
         rdd = rdd.map(lambda x: (x,1))  # map each word to a key
         rdd = rdd.reduceByKey(lambda x,y: x + y).sortByKey() #  merge the values of each key
-        """df = rdd.toDF(['Word', f'Count_Link{str(data_files.index(content))}']).toPandas().sort_values(f'Count_Link{str(data_files.index(content))}', axis=0, ascending = False).set_index('Word')
-        print(df)"""
-
     end = time.time()
-    time = end - start
-    executionTime.append(time)
+    running_time = end - start
+    execution_time.append(running_time)
 
-for time in executionTime:
-    print('WORDCOUNT TAKES ' + str(time) + 'S FOR SPARK')
+for timer in execution_time:
+    print('WORDCOUNT TAKES ' + str(timer) + 'S FOR SPARK')
