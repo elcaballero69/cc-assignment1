@@ -63,7 +63,7 @@ mv pg4300.txt input
 
 userdata_spark="""#!/bin/bash
 sudo apt-get update
-yes | sudo apt install default-jdk scala git -y
+sudo apt install default-jdk scala git -y
 sudo apt-get install wget
 sudo wget https://archive.apache.org/dist/spark/spark-3.0.1/spark-3.0.1-bin-hadoop2.7.tgz
 sudo tar xvf spark-*
@@ -73,44 +73,9 @@ export SPARK_HOME=/opt/spark
 export PATH=\$PATH:\$SPARK_HOME/bin:\$SPARK_HOME/sbin
 export PYSPARK_PYTHON=/usr/bin/python3
 EOF
-source ~/.profile
-sudo apt install python3-pip
-y | pip install urllib3
-pip install pandas
-pip install flask
-pip install xlsxwriter
-pyspark
-import urllib3
-import pandas as pd
-import time
-http = urllib3.PoolManager()
-LINKS = ['http://www.gutenberg.ca/ebooks/buchanj-midwinter/buchanj-midwinter-00-t.txt',
-         'http://www.gutenberg.ca/ebooks/carman-farhorizons/carman-farhorizons-00-t.txt',
-         'http://www.gutenberg.ca/ebooks/colby-champlain/colby-champlain-00-t.txt',
-         'http://www.gutenberg.ca/ebooks/cheyneyp-darkbahama/cheyneyp-darkbahama-00-t.txt',
-         'http://www.gutenberg.ca/ebooks/delamare-bumps/delamare-bumps-00-t.txt',
-         'http://www.gutenberg.ca/ebooks/charlesworth-scene/charlesworth-scene-00-t.txt',
-         'http://www.gutenberg.ca/ebooks/delamare-lucy/delamare-lucy-00-t.txt',
-         'http://www.gutenberg.ca/ebooks/delamare-myfanwy/delamare-myfanwy-00-t.txt',
-         'http://www.gutenberg.ca/ebooks/delamare-penny/delamare-penny-00-t.txt'
-         ]
-result = pd.DataFrame()
-start = time.time()
-for i in range(0,3):
-    for link in LINKS:
-        r = http.request('GET', link)
-        content = r.data.decode('latin-1')
-        content = content.replace('\n',' ')
-        rdd = sc.parallelize(content.split(' '))
-        rdd = rdd.map(lambda x: (x,1))
-        rdd = rdd.reduceByKey(lambda x,y: x + y).sortByKey()
-        df = rdd.toDF(['Word', f'Count_Link{str(LINKS.index(link))}']).toPandas().sort_values(f'Count_Link{str(LINKS.index(link))}', axis=0, ascending = False).set_index('Word')
-        if i == 0:
-            result = pd.concat([result, df], axis=1)
-            df.to_excel('~/wordcount_file.xlsx', engine = 'xlsxwriter')
-end = time.time()
-with open("elapsed_time.txt", "w") as f:
-    f.write(str(end-start))
+yes | sudo apt install python3-pip
+pip install urllib3
+pip install pyspark
 """
 
 def createSecurityGroup(ec2_client):
@@ -199,7 +164,6 @@ def getAvailabilityZones(ec2_client):
         availabilityzones.update({subnet.get('AvailabilityZone'): subnet.get('SubnetId')})
 
     return availabilityzones
-
 
 def createInstance(ec2, INSTANCE_TYPE, COUNT, SECURITY_GROUP, SUBNET_ID, userdata):
     """
@@ -292,7 +256,6 @@ def createInstances(ec2_client, ec2, SECURITY_GROUP, availabilityZones, userdata
 
     return [instance_ids, ip]
 
-
 def getParamikoClient():
     """
         Retrievs the users PEM file and creates a paramiko client required to ssh into the instances
@@ -372,7 +335,6 @@ def get_execution_time(client, command):
     except:
         print("error occured in getting execution time")
 
-
 def compare_Hadoop_vs_Linux_worcount(ip, client, accesKey):
     """
         performing the benchmarking between linux and hadoop.
@@ -412,7 +374,6 @@ def compare_Hadoop_vs_Linux_worcount(ip, client, accesKey):
     print("Execution time for Linux is:", linux_time, '\n')
 
     client.close()
-
 
 def addNewInputfiles(client, accesKey, ip_hadoop):
     """
@@ -560,6 +521,40 @@ def plot_time(hadoop_wordcount_time, title):
     plt.xlabel("Iteration")
     plt.show()
 
+
+def runWordcountSpark(client, accesKey, ip_spark):
+    """
+                running the second wordcount example on spark using python code for the benchmarking
+
+                connect to instance
+                enter pyspark environment
+                run python code on instance
+                close client
+
+                Parameters
+                ----------
+                client : client
+                    paramiko client to ssh into instance
+                accesKey : str
+                    peronsonal key to gain access to instance
+                ip_spark : str
+                    ip of the spark instance, to gain access to specific client
+
+                """
+    try:
+        client.connect(hostname=ip_spark, username="ubuntu", pkey=accesKey)
+    except:
+        print("could not connect to client")
+
+    # setting up new input files for hadoop, for the second benchmarking scenario
+    res = send_command(client, 'sudo wget https://raw.githubusercontent.com/elcaballero69/cc-assignment1/main/Assignment_2/spark_wordcount.py')
+    res = send_command(client, "source ~/.profile \n "
+                               "pyspark \n "
+                               "exec(open('spark_wordcount.py').read())")
+
+
+    client.close()
+
 def main():
     """
         main function fer performing the application
@@ -595,7 +590,7 @@ def main():
 
     """-------------------Run Wordcount experiment hadoop vs linux--------------------------"""
     print("Wait installation")
-    time.sleep(300)
+    time.sleep(420)
     print("Comparing Hadoop vs linux in wordcount")
     compare_Hadoop_vs_Linux_worcount(ins_hadoop[1], paramiko_client, accesKey)
     print("Check the instance: \n", str(ins_hadoop[1]), "\n")
@@ -603,11 +598,13 @@ def main():
     """-------------------Run Wordcount experiment hadoop vs spark--------------------------"""
     addNewInputfiles(paramiko_client, accesKey, ins_hadoop[1])
     runWordcountHadoop(paramiko_client, accesKey, ins_hadoop[1])
+    runWordcountSpark(paramiko_client, accesKey, ins_spark[1])
     """-------------------Get output--------------------------"""
     hadoop_wordcount_time_str = getHadoopWordcountRunTime(paramiko_client, accesKey, ins_hadoop[1])
     """-------------------plot and compare--------------------------"""
     hadoop_wordcount_time = changeStrToTime(hadoop_wordcount_time_str)
     plot_time(hadoop_wordcount_time, "Hadoop Wordcount Execution Time")
+    print("done")
     """-------------------Write MapReduce program--------------------------"""
 
     """-------------------Run Recomendation System--------------------------"""

@@ -11,8 +11,13 @@ export PATH=\$PATH:\$SPARK_HOME/bin:\$SPARK_HOME/sbin
 export PYSPARK_PYTHON=/usr/bin/python3
 EOF
 source ~/.profile
-sudo apt install python3-pip
-y | echo -ne '\n' | mycommand
+yes | sudo apt install python3-pip
 pip install urllib3
-pip install pandas
 pip install xlsxwriter
+pip install pyspark
+
+y | echo -ne '\n' | mycommand
+
+source ~/.profile \n
+pyspark \n
+print("hello world")
