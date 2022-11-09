@@ -23,7 +23,7 @@ for link in LINKS:
     data_files.append(content)
 
 execution_time = []
-for i in range(0,3):
+for i in range(1,4):
     start = time.time()
     for content in data_files:
         rdd = sc.parallelize(content.split(' ')) # form RDD
@@ -32,6 +32,9 @@ for i in range(0,3):
     end = time.time()
     running_time = end - start
     execution_time.append(running_time)
+
+with open('spark_execution_time.txt', 'w') as file:
+    file.writelines(execution_time)
 
 for timer in execution_time:
     print('WORDCOUNT TAKES ' + str(timer) + 'S FOR SPARK')
