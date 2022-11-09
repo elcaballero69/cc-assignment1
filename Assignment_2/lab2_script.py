@@ -20,11 +20,19 @@ import matplotlib as mpl
 from pathlib import Path
 
 def get_project_root() -> Path:
+    """
+    Function for getting the path where the program is executed
+    @ return: returns the parent path of the path were the program is executed
+    """
     return Path(__file__).parent
 
 # This makes the plots made by the script open in a webbrowser
 # mpl.use('WebAgg')
 
+"""
+The user data constants are used to setup and download programs on the instances
+They are passed as arguments in the create instance step
+"""
 
 userdata_hadoop="""#!/bin/bash
 cd /home/ubuntu
@@ -106,6 +114,30 @@ with open("elapsed_time.txt", "w") as f:
 """
 
 def createSecurityGroup(ec2_client):
+    """
+        The function creates a new security group in AWS
+        The function retrievs the vsp_id from the AWS portal, as it is personal and needed for creating a new group
+        It then creates the security group using boto3 package
+        then it waits for the creation
+        then it assigns new rules to the security group
+
+        Parameters
+        ----------
+        ec2_client
+            client that allows for sertain functions using boto3
+
+        Returns
+        -------
+        SECURITY_GROUP : list[str]
+            list of the created security group ids
+        vpc_id : str
+            the vpc_id as it is needed for other operations
+
+        Errors
+        -------
+        The function throws an error if a security group with the same name already exists in your AWS
+
+    """
     # Create security group, using SSH & HHTP access available from anywhere
     groups = ec2_client.describe_security_groups()
     vpc_id = groups["SecurityGroups"][0]["VpcId"]
@@ -136,12 +168,6 @@ def createSecurityGroup(ec2_client):
             'ToPort': 80,
             'IpProtocol': 'tcp',
             'IpRanges': [{'CidrIp': '0.0.0.0/0'}]
-        },
-        {
-            'FromPort': 8080,
-            'ToPort': 8080,
-            'IpProtocol': 'tcp',
-            'IpRanges': [{'CidrIp': '0.0.0.0/0'}]
         }]
     )
 
@@ -149,6 +175,21 @@ def createSecurityGroup(ec2_client):
     return SECURITY_GROUP, vpc_id
 
 def getAvailabilityZones(ec2_client):
+    """
+        Retrieving the subnet ids for availability zones
+        they are required to assign for example instances to a specific availabilityzone
+
+        Parameters
+        ----------
+        ec2_client
+            client of boto3 tho access certain methods related to AWS EC2
+
+        Returns
+        -------
+        dict
+            a dictonary, with availability zone name as key and subnet id as value
+
+        """
     # Availability zones
     response = ec2_client.describe_subnets()
 
@@ -161,6 +202,30 @@ def getAvailabilityZones(ec2_client):
 
 
 def createInstance(ec2, INSTANCE_TYPE, COUNT, SECURITY_GROUP, SUBNET_ID, userdata):
+    """
+        function that creates EC2 instances on AWS
+
+        Parameters
+        ----------
+        ec2 : client
+            ec2 client to perform actions on AWS EC2 using boto3
+        INSTANCE_TYPE : str
+            name of the desired instance type.size
+        COUNT : int
+            number of instances to be created
+        SECURITY_GROUP : array[str]
+            array of the security groups that should be assigned to the instance
+        SUBNET_ID : str
+            subnet id that assigns the instance to a certain availability zone
+        userdata : str
+            string that setups and downloads programs on the instance at creation
+
+        Returns
+        -------
+        array
+            list of all created instances, including their data
+
+        """
     # Don't change these
     KEY_NAME = "vockey"
     INSTANCE_IMAGE = "ami-08d4ac5b634553e16"
@@ -177,6 +242,31 @@ def createInstance(ec2, INSTANCE_TYPE, COUNT, SECURITY_GROUP, SUBNET_ID, userdat
     )
 
 def createInstances(ec2_client, ec2, SECURITY_GROUP, availabilityZones, userdata):
+    """
+        function that retrievs and processes attributes as well as defining the amount and types of instances to be created
+        getting the decired subnet id
+        calling function create instance to create the instances
+        parces the return to just return the ids and ips of the instances
+        currently handle only creation of one instance
+
+        Parameters
+        ----------
+        ec2_client : client
+            Boto3 client to access certain function to controll AWS CLI
+        ec2 : client
+            Boto3 client to access certain function to controll AWS CLI
+        SECURITY_GROUP : array[str]
+            list of security groups to assign to instances
+        availabilityZones : dict{str, str}
+            dict of availability zone names an key and subnet ids as value
+        userdata : str
+            script to setup instances
+
+        Returns
+        -------
+        array
+            containg instance id and ip
+        """
     # Get wanted availability zone
     availability_zone_1a = availabilityZones.get('us-east-1a')
 
@@ -203,28 +293,18 @@ def createInstances(ec2_client, ec2, SECURITY_GROUP, availabilityZones, userdata
     return [instance_ids, ip]
 
 
-def waiter(ec2_client, ins_hadoop, ins_spark):
-    ready = False
-    accesKey = paramiko.RSAKey.from_private_key_file(
-        "C:/Users/meste/PycharmProjects/CloudComputing/cc-assignment1/Assignment_2/labsuser.pem")
-    client = paramiko.SSHClient()
-    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    while (ready == False):
-        try:
-            client.connect(hostname=ins_hadoop[1], username="ubuntu", pkey=accesKey)
-            # client.connect(hostname=ins_spark[1], username="ubuntu", pkey=accesKey)
-            print("testing connection")
-        except:
-            time.sleep(10)
-        else:
-            client.close()
-            print("instances up and running")
-            ready = True
-
-    return True
-
-
 def getParamikoClient():
+    """
+        Retrievs the users PEM file and creates a paramiko client required to ssh into the instances
+
+        Returns
+        -------
+        client
+            the paramiko client
+        str
+            the access key from the PEM file
+
+        """
     path = str(get_project_root()).replace('\\', '/')
     print("path", path)
     accesKey = paramiko.RSAKey.from_private_key_file(path + "/labsuser.pem")
@@ -234,15 +314,53 @@ def getParamikoClient():
     return client, accesKey
 
 def send_command(client, command):
+    """
+        function that sends command to an instance using paramiko
+        print possible errors and return values
+
+        Parameters
+        ----------
+        client : client
+            the paramiko client required to connect to the intance usin ssh
+        command : str
+            The desired commands are sent to the instance
+
+        Returns
+        -------
+        str
+            returns the return value of commands
+
+        """
     try:
         stdin, stdout, stderr = client.exec_command(command)
+        # the read() function reads the output in bit form
         print("stderr.read():", stderr.read())
-        #output = stdout.read().decode('ascii').split("\n")
         print("stdout", stdout.read())
+        # converts the bit string to str
+        output = stdout.read().decode('ascii').split("\n")
+
+        return output
     except:
         print("error occured in sending command")
 
 def get_execution_time(client, command):
+    """
+        we save the execution time in the instance as a text file
+        we retrieve this file to be able to display and plot the execution times
+
+        Parameters
+        ----------
+        client : client
+            paramiko client to ssh into instance
+        command : str
+            command string that we want to execute
+
+        Returns
+        -------
+        str
+            the time in stringformat 0m7.898s
+
+        """
     try:
         stdin, stdout, stderr = client.exec_command(command)
         print("stderr.read():", stderr.read())
@@ -256,6 +374,23 @@ def get_execution_time(client, command):
 
 
 def compare_Hadoop_vs_Linux_worcount(ip, client, accesKey):
+    """
+        performing the benchmarking between linux and hadoop.
+        connecting to instance using paramiko client
+        Performing the wordcount using both systems
+        retrieve the excution times of both executions
+        prints the times for comparison
+        closes client
+
+        Parameters
+        ----------
+        ip : str
+            ip adress of the instance we wish to connect to
+        client : client
+            paramiko client to ssh into instance
+        accesKey : str
+            private accesskey to gain access to instance
+    """
 
     try:
         client.connect(hostname=ip, username="ubuntu", pkey=accesKey)
@@ -280,7 +415,24 @@ def compare_Hadoop_vs_Linux_worcount(ip, client, accesKey):
 
 
 def addNewInputfiles(client, accesKey, ip_hadoop):
+    """
+        creates a new directory and adds new input files to it on the instance
+        these are required to perform the benchmarking between hadoop and spark
 
+        connects to instance
+        adds files
+        closes client
+
+        Parameters
+        ----------
+        client : client
+            paramiko client to ssh into instance
+        accesKey : str
+            peronsonal key to gain access to instance
+        ip_hadoop : str
+            ip of the hadoop instance,  to gain access to specific client
+
+        """
     try:
         client.connect(hostname=ip_hadoop, username="ubuntu", pkey=accesKey)
     except:
@@ -304,6 +456,23 @@ def addNewInputfiles(client, accesKey, ip_hadoop):
     client.close()
 
 def runWordcountHadoop(client, accesKey, ip_hadoop):
+    """
+        running the second wordcount example on hadoop for three iterations for the benchmarking
+
+        connect to instance
+        run wordcount
+        close client
+
+        Parameters
+        ----------
+        client : client
+            paramiko client to ssh into instance
+        accesKey : str
+            peronsonal key to gain access to instance
+        ip_hadoop : str
+            ip of the hadoop instance,  to gain access to specific client
+
+        """
     try:
         client.connect(hostname=ip_hadoop, username="ubuntu", pkey=accesKey)
     except:
@@ -318,6 +487,24 @@ def runWordcountHadoop(client, accesKey, ip_hadoop):
     client.close()
 
 def getHadoopWordcountRunTime(client, accesKey, ip_hadoop):
+    """
+        retrieves the execution time from the execution time files from the instance for the second wordcount
+
+        Parameters
+        ----------
+        client : client
+            paramiko client to ssh into instance
+        accesKey : str
+            peronsonal key to gain access to instance
+        ip_hadoop : str
+            ip of the hadoop instance,  to gain access to specific client
+
+        Returns
+        -------
+        array[str]
+            array of the execution times for hadoop benchmarking
+
+        """
     try:
         client.connect(hostname=ip_hadoop, username="ubuntu", pkey=accesKey)
     except:
@@ -334,6 +521,21 @@ def getHadoopWordcountRunTime(client, accesKey, ip_hadoop):
     return hadoop_wordcount_time
 
 def changeStrToTime(hadoop_wordcount_time_str):
+    """
+        transforming the string formatted time into time format
+        required to plot correctly
+
+        Parameters
+        ----------
+        hadoop_wordcount_time_str : array[str]
+            array of the execution times in str format
+
+        Returns
+        -------
+        array[time]
+            array of the execution times in time format
+
+        """
     hadoop_wordcount_time = []
     for x in hadoop_wordcount_time_str:
         time = x.replace('m', ':').replace('s', '').replace('.', ':')
@@ -341,6 +543,17 @@ def changeStrToTime(hadoop_wordcount_time_str):
     return hadoop_wordcount_time
 
 def plot_time(hadoop_wordcount_time, title):
+    """
+        plotting the execution times for visual benchmarking
+
+        Parameters
+        ----------
+        hadoop_wordcount_time : array[time]
+            array of the execution times in time format
+        title : str
+            title for the plot
+
+        """
     plt.plot(hadoop_wordcount_time, 'bo--')
     plt.title(title)
     plt.ylabel("Execution Time")
@@ -348,12 +561,17 @@ def plot_time(hadoop_wordcount_time, title):
     plt.show()
 
 def main():
+    """
+        main function fer performing the application
+
+        Conncets to the boto3 clients
+        calls the required functions
+
+        """
     """------------Get necesarry clients from boto3------------------------"""
     ec2_client = boto3.client("ec2")
     ec2 = boto3.resource('ec2')
-    elbv2 = boto3.client('elbv2')
-    cw = boto3.client('cloudwatch')
-    iam = boto3.client('iam')
+
     """------------Create Paramiko Client------------------------------"""
     paramiko_client, accesKey = getParamikoClient()
 
