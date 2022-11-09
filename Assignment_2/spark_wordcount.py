@@ -34,7 +34,8 @@ for i in range(1,4):
     execution_time.append(running_time)
 
 with open('spark_execution_time.txt', 'w') as file:
-    file.writelines(execution_time)
+    for iteration in execution_time:
+        file.write(str(iteration))
 
 for timer in execution_time:
     print('WORDCOUNT TAKES ' + str(timer) + 'S FOR SPARK')
