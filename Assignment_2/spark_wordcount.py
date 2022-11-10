@@ -2,6 +2,8 @@
 import urllib3
 import time
 http = urllib3.PoolManager()
+from pyspark import SparkContext
+sc =SparkContext.getOrCreate()
 
 # texts to analyze
 LINKS = ['http://www.gutenberg.ca/ebooks/buchanj-midwinter/buchanj-midwinter-00-t.txt',

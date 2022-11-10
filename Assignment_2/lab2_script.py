@@ -549,8 +549,7 @@ def runWordcountSpark(client, accesKey, ip_spark):
     # setting up new input files for hadoop, for the second benchmarking scenario
     res = send_command(client, 'sudo wget https://raw.githubusercontent.com/elcaballero69/cc-assignment1/main/Assignment_2/spark_wordcount.py')
     res = send_command(client, "source ~/.profile \n "
-                               "pyspark \n "
-                               "exec(open('spark_wordcount.py').read())")
+                               "pyspark < spark_wordcount.py")
 
 
     client.close()
