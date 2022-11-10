@@ -1,3 +1,13 @@
+"""
+executing wordcount on spark using this python script.
+it imports the required libraries
+downloads the text files
+iterates through the textfiles performing wordcount, 3 times for benchmarking purposes
+writes the execution time to a text file on the instance
+
+"""
+
+
 # run this script on the remote machine's pyspark
 import urllib3
 import time

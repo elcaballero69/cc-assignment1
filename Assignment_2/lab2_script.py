@@ -298,10 +298,9 @@ def send_command(client, command):
         stdin, stdout, stderr = client.exec_command(command)
         # the read() function reads the output in bit form
         print("stderr.read():", stderr.read())
-        print("stdout", stdout.read())
         # converts the bit string to str
         output = stdout.read().decode('ascii').split("\n")
-
+        print("output", output)
         return output
     except:
         print("error occured in sending command")
@@ -499,24 +498,29 @@ def changeStrToTime(hadoop_wordcount_time_str):
         """
     hadoop_wordcount_time = []
     for x in hadoop_wordcount_time_str:
-        time = x.replace('m', ':').replace('s', '').replace('.', ':')
-        hadoop_wordcount_time.append(datetime.strptime(time, '%M:%S:%f'))
+        t = x.split('m')
+        time = t[1].replace('s', '').replace('.', ':')
+        hadoop_wordcount_time.append(datetime.strptime(time, '%S:%f'))
     return hadoop_wordcount_time
 
-def plot_time(hadoop_wordcount_time, title):
+def plot_time(hadoop_wordcount_time, spark_wordcount_time, title):
     """
-        plotting the execution times for visual benchmarking
+        plotting the execution times of hadoop and spark for visual benchmarking
 
         Parameters
         ----------
         hadoop_wordcount_time : array[time]
             array of the execution times in time format
+        spark_wordcount_time : array[time]
+            array of the execution times in time format
         title : str
             title for the plot
 
         """
-    plt.plot(hadoop_wordcount_time, 'bo--')
+    plt.plot(hadoop_wordcount_time, 'bo--', label="Hadoop")
+    plt.plot(spark_wordcount_time, 'ro--', label="Spark")
     plt.title(title)
+    plt.legend(loc="upper right")
     plt.ylabel("Execution Time")
     plt.xlabel("Iteration")
     plt.show()
@@ -527,7 +531,7 @@ def runWordcountSpark(client, accesKey, ip_spark):
                 running the second wordcount example on spark using python code for the benchmarking
 
                 connect to instance
-                enter pyspark environment
+                download python script from git
                 run python code on instance
                 close client
 
@@ -551,8 +555,49 @@ def runWordcountSpark(client, accesKey, ip_spark):
     res = send_command(client, "source ~/.profile \n "
                                "pyspark < spark_wordcount.py")
 
-
     client.close()
+
+def getSparkWordcountTime(client, accesKey, ip_spark):
+    """
+        retrieve the execution time document from spark instance
+
+        connect to instance
+        get execution time file
+        change file data time date, needed for plotting
+        close client
+
+        Parameters
+        ----------
+        client : client
+            paramiko client to ssh into instance
+        accesKey : str
+            peronsonal key to gain access to instance
+        ip_spark : str
+            ip of the spark instance, to gain access to specific client
+
+        returns
+        ----------
+        execution_time : array[time]
+            array of time date formatted executiontimes
+
+        """
+    try:
+        client.connect(hostname=ip_spark, username="ubuntu", pkey=accesKey)
+    except:
+        print("could not connect to client")
+
+    # setting up new input files for hadoop, for the second benchmarking scenario
+    res = send_command(client, "cat spark_execution_time.txt")
+    print("res", res)
+    execution_time = []
+    for x in res:
+        if (x != ''):
+            time1 = x.replace('.',':').replace('S','')
+            execution_time.append(datetime.strptime(time1[:8], '%S:%f'))
+
+    print("execution time", execution_time)
+    client.close()
+    return execution_time
 
 def main():
     """
@@ -588,7 +633,7 @@ def main():
     print("Instance ip: \n", str(ins_spark[1]), "\n")
 
     """-------------------Run Wordcount experiment hadoop vs linux--------------------------"""
-    print("Wait installation")
+    print("Wait installation 7 min")
     time.sleep(420)
     print("Comparing Hadoop vs linux in wordcount")
     compare_Hadoop_vs_Linux_worcount(ins_hadoop[1], paramiko_client, accesKey)
@@ -600,9 +645,10 @@ def main():
     runWordcountSpark(paramiko_client, accesKey, ins_spark[1])
     """-------------------Get output--------------------------"""
     hadoop_wordcount_time_str = getHadoopWordcountRunTime(paramiko_client, accesKey, ins_hadoop[1])
+    spark_wordcount_time = getSparkWordcountTime(paramiko_client, accesKey, ins_spark[1])
     """-------------------plot and compare--------------------------"""
     hadoop_wordcount_time = changeStrToTime(hadoop_wordcount_time_str)
-    plot_time(hadoop_wordcount_time, "Hadoop Wordcount Execution Time")
+    plot_time(hadoop_wordcount_time, spark_wordcount_time, "Hadoop vs Spark Wordcount Execution Time")
     print("done")
     """-------------------Write MapReduce program--------------------------"""
 
